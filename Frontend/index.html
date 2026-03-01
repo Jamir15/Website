@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Sensor Dashboard</title>
+    <link rel="stylesheet" href="index.css">
+
+    <!-- ES Module Shims for import maps -->
+    <script async src="https://unpkg.com/es-module-shims@1.6.3/dist/es-module-shims.js"></script>
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.163.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.163.0/examples/jsm/",
+                "chart.js/auto": "https://cdn.jsdelivr.net/npm/chart.js@4.4.2/+esm",
+                "firebase/app": "https://www.gstatic.com/firebasejs/10.10.0/firebase-app.js",
+                "firebase/firestore": "https://www.gstatic.com/firebasejs/10.10.0/firebase-firestore.js"
+            }
+        }
+    </script>
+</head>
+<body>
+
+    <!-- ======= GRID LAYOUT START ======= -->
+    <div class="layout-grid">
+
+        <!-- LEFT SIDEBAR -->
+        <aside class="sidebar-left">
+            <h2 class="sidebar-title">Dashboard</h2>
+
+            <!-- DATE & TIME DISPLAY -->
+            <div class="datetime-box">
+                <div id="ph-time">--:--</div>
+                <div id="ph-date">---, -- --- ----</div>
+            </div>
+
+            <!-- ===========================
+                 NOTIFICATIONS CONTAINER
+            ============================ -->
+            <div id="notifications-container">
+                <!-- Heat Index Alert -->
+                <div id="alert-banner" class="notification hidden">
+                    <p id="alert-message"></p>
+                </div>
+
+                <!-- Peak Heat Hours Reminder -->
+                <div id="peak-heat-banner" class="notification hidden">
+                    <p id="peak-heat-message">🌤️ Peak Heat Hours Reminder</p>
+                </div>
+            </div>
+
+            <!-- VIEW CONTROLS -->
+            <div class="view-controls">
+                <label class="toggle-row">
+                    <span class="toggle-label">Heat Map</span>
+                    <input type="checkbox" id="heatmap-toggle" checked>
+                    <span class="toggle-switch"></span>
+                </label>
+            </div>
+
+            <!-- ROOM NAVIGATION -->
+            <nav class="nav-links">
+                <a href="#" data-room="room1" class="room-link active">Room 1</a>
+                <a href="#" data-room="room2" class="room-link">Room 2</a>
+            </nav>
+        </aside>
+
+
+        <!-- MAIN CONTENT AREA -->
+        <main class="main-content">
+
+            <!-- Middle Row: 3D Model + Chart -->
+            <div class="threejs-chart-wrapper">
+
+                <!-- 3D Model Viewer -->
+                <div class="threejs-wrapper">
+                    <div id="canvas-container"></div>
+                    <div id="loading-overlay">Loading Model...</div>
+                </div>
+
+                <!-- Chart -->
+                <div class="chart-container">
+                    <!-- Keep the ID as 'sensorChart' to ensure JS compatibility -->
+                    <canvas id="sensorChart"></canvas>
+                </div>
+
+            </div>
+
+            <!-- SENSOR CARDS -->
+            <div class="data-cards">
+                <div class="card">
+                    <h3>Temperature</h3>
+                    <div class="value"><span id="temp-val">--</span> °C</div>
+                </div>
+                <div class="card">
+                    <h3>Humidity</h3>
+                    <div class="value"><span id="hum-val">--</span> %</div>
+                </div>
+                <div class="card">
+                    <h3>Heat Index</h3>
+                    <div class="value"><span id="hi-val">--</span> °C</div>
+                </div>
+            </div>
+
+            <!-- DECISION SUPPORT SYSTEM (DSS) CARD -->
+            <div class="card" id="dss-card">
+                <div class="dss-header">
+                    <h3 id="dss-title">Heat Index Advisory (Decision Support System): --</h3>
+                </div>
+                <div id="dss-content">
+                    <p>Waiting data...</p>
+                </div>
+                <p id="dss-source">Based on CDRRMO Heat Index Threshold Guidelines</p>
+            </div>
+
+        </main>
+
+        <!-- RIGHT SIDEBAR (AI CHAT) -->
+        <aside class="sidebar-right">
+            <div class="chat-header">AI Assistant</div>
+            <div class="chat-container">
+                <div id="chat-messages"></div>
+                <div class="chat-input-row">
+                    <input 
+                        type="text"
+                        id="chat-input"
+                        placeholder="Type your question..."
+                    />
+                    <button id="chat-send">Send</button>
+                </div>
+            </div>
+        </aside>
+
+    </div>
+    <!-- ======= GRID LAYOUT END ======= -->
+
+    <!-- MAIN JS MODULE -->
+    <script type="module">
+    import './main.js';
+    import './chatAi.js';
+    </script>
+</body>
+</html>

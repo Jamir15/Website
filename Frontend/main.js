@@ -527,13 +527,13 @@ function updateDashboard(temp, humidity, hi, label, advisory) {
     case 'Caution':
       color = 'green';
       break;
-    case 'EXTREME CAUTION':
+    case 'Extreme Caution':
       color = 'yellow';
       break;
-    case 'DANGER':
+    case 'Danger':
       color = 'orange';
       break;
-    case 'EXTREME DANGER':
+    case 'Extreme Danger':
       color = 'red';
       break;
     case 'ESTIMATED (FALLBACK)':

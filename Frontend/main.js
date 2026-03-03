@@ -2,23 +2,21 @@
  * main.js – DSS Dashboard – ESP8266 + BMP280 + Firestore
  * Three.js viewer + Firestore real-time listener
  * ===================================================================== */
-console.log('MAIN.JS IS RUNNING');
+console.log("MAIN.JS IS RUNNING");
 
-import * as THREE from 'three';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { initializeApp } from 'firebase/app';
-import {getFirestore, doc, onSnapshot} from 'firebase/firestore';
-import { Chart, registerables } from 'chart.js/auto';
-import { initAIChat, updateAIContext } from './chatAi.js';
+import * as THREE from "three";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { initializeApp } from "firebase/app";
+import { getFirestore, doc, onSnapshot } from "firebase/firestore";
+import { Chart, registerables } from "chart.js/auto";
+import { initAIChat, updateAIContext } from "./chatAi.js";
 let backendDown = false;
-
-
 
 Chart.register(...registerables);
 
 /* =====================================================================
- * AI SHARED STATE (latest sensor snapshot) 
+ * AI SHARED STATE (latest sensor snapshot)
  * ===================================================================== */
 
 let latestAIContext = {
@@ -27,7 +25,7 @@ let latestAIContext = {
   humidity: null,
   heatIndex: null,
   label: null,
-  advisory: null
+  advisory: null,
 };
 
 let worldTimeApiFailed = false; // Flag for WorldTimeAPI failure
@@ -37,13 +35,13 @@ let worldTimeApiFailed = false; // Flag for WorldTimeAPI failure
  * ===================================================================== */
 
 const firebaseConfig = {
-  apiKey: 'AIzaSyCq6MUL63iHYpOrGqoQrWCjDPWhOnNajmQ',
-  authDomain: 'dss-database-51609.firebaseapp.com',
-  projectId: 'dss-database-51609',
-  storageBucket: 'dss-database-51609.firebasestorage.app',
-  messagingSenderId: '514112370816',
-  appId: '1:514112370816:web:46c160c80475164b98ce65',
-  measurementId: 'G-707NP59NVW'
+  apiKey: "AIzaSyCq6MUL63iHYpOrGqoQrWCjDPWhOnNajmQ",
+  authDomain: "dss-database-51609.firebaseapp.com",
+  projectId: "dss-database-51609",
+  storageBucket: "dss-database-51609.firebasestorage.app",
+  messagingSenderId: "514112370816",
+  appId: "1:514112370816:web:46c160c80475164b98ce65",
+  measurementId: "G-707NP59NVW",
 };
 
 const app = initializeApp(firebaseConfig);
@@ -63,9 +61,9 @@ function initThermalRecoveryState(roomId) {
   }
 }
 
-function listenToThermal(roomId = 'room1') {
+function listenToThermal(roomId = "room1") {
   initThermalRecoveryState(roomId);
-  const ref = doc(db, 'thermalRooms', roomId);
+  const ref = doc(db, "thermalRooms", roomId);
 
   onSnapshot(ref, (snap) => {
     if (!snap.exists()) return;
@@ -85,7 +83,7 @@ function listenToThermal(roomId = 'room1') {
         ready: false,
         dirty: false,
         lastUpdateTime: 0,
-        stale: false
+        stale: false,
       };
     }
 
@@ -120,7 +118,7 @@ function computeFallbackHeatIndex(tempC, humidity) {
   let HI = tempC;
 
   if (tempC >= 27) {
-    HI = tempC + (0.05 * humidity);
+    HI = tempC + 0.05 * humidity;
   }
 
   // Never exaggerate perceived heat
@@ -134,21 +132,21 @@ function computeFallbackHeatIndex(tempC, humidity) {
  * ROOM SELECTION LOGIC
  * ===================================================================== */
 
-let activeRoom = 'room1'; // default room
+let activeRoom = "room1"; // default room
 let isHeatmapEnabled = true;
 
 function setupRoomClickHandlers() {
-  const roomLinks = document.querySelectorAll('.room-link');
+  const roomLinks = document.querySelectorAll(".room-link");
 
-  roomLinks.forEach(link => {
-    link.addEventListener('click', e => {
+  roomLinks.forEach((link) => {
+    link.addEventListener("click", (e) => {
       e.preventDefault();
-      roomLinks.forEach(l => l.classList.remove('active'));
-      link.classList.add('active');
+      roomLinks.forEach((l) => l.classList.remove("active"));
+      link.classList.add("active");
       activeRoom = link.dataset.room;
-      console.log('Active room changed to:', activeRoom);
+      console.log("Active room changed to:", activeRoom);
 
-      document.getElementById('dss-content').innerHTML =
+      document.getElementById("dss-content").innerHTML =
         `<p>Currently viewing data for <b>${activeRoom.toUpperCase()}</b></p>`;
 
       // Start listening to thermal data for this room if not already
@@ -164,7 +162,7 @@ function setupRoomClickHandlers() {
  * ===================================================================== */
 
 function initThreeJS() {
-  const container = document.getElementById('canvas-container');
+  const container = document.getElementById("canvas-container");
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0xffffff);
 
@@ -172,7 +170,7 @@ function initThreeJS() {
     75,
     container.clientWidth / container.clientHeight,
     0.1,
-    1000
+    1000,
   );
   camera.position.set(0, 1, 3);
 
@@ -186,7 +184,7 @@ function initThreeJS() {
   /* ===== CLASSROOM REAL-WORLD DIMENSIONS (meters) ===== */
   const ROOM_WIDTH = 7.81; // X-axis (left ↔ right)
   const ROOM_DEPTH = 6.92; // Z-axis (front ↔ back)
-  const WALL_HEIGHT = 2.60; // Y-axis (floor → top of wall)
+  const WALL_HEIGHT = 2.6; // Y-axis (floor → top of wall)
   // Z-position of the front wall (Three.js forward is -Z by convention)
   const FRONT_WALL_Z = -ROOM_DEPTH / 2;
   const DETACH_OFFSET = 0.05; // small offset to avoid z-fighting
@@ -194,75 +192,75 @@ function initThreeJS() {
   /* ===== THERMAL HEATMAP PLACEHOLDER ===== */
   let heatmapMesh = null;
   let heatmapTexture = null;
-  const heatmapCanvas = document.createElement('canvas');
+  const heatmapCanvas = document.createElement("canvas");
   heatmapCanvas.width = 32;
   heatmapCanvas.height = 24;
-  const heatmapCtx = heatmapCanvas.getContext('2d');
+  const heatmapCtx = heatmapCanvas.getContext("2d");
 
   // Paint initial black frame (prevents "dead black" texture)
-  heatmapCtx.fillStyle = 'black';
+  heatmapCtx.fillStyle = "black";
   heatmapCtx.fillRect(0, 0, 32, 24);
 
-function updateHeatFromFrontSensor(frame) {
-  if (!frame || frame.length !== 768) return;
+  function updateHeatFromFrontSensor(frame) {
+    if (!frame || frame.length !== 768) return;
 
-  // 1. Normalize temperatures for color mapping
-  let minT = Infinity;
-  let maxT = -Infinity;
-  for (const t of frame) {
-    if (t < minT) minT = t;
-    if (t > maxT) maxT = t;
-  }
-  if (maxT - minT < 2) maxT = minT + 2;
+    // 1. Normalize temperatures for color mapping
+    let minT = Infinity;
+    let maxT = -Infinity;
+    for (const t of frame) {
+      if (t < minT) minT = t;
+      if (t > maxT) maxT = t;
+    }
+    if (maxT - minT < 2) maxT = minT + 2;
 
-  // 2. Draw raw thermal pixels to the 32x24 canvas
-  for (let i = 0; i < 768; i++) {
-    const val = frame[i];
-    const norm = Math.max(0, Math.min(1, (val - minT) / (maxT - minT)));
-    
-    // Map intensity to HSL: 240 (Blue) to 0 (Red)
-    const hue = (0.66 - (norm * 0.66)) * 360;
-    heatmapCtx.fillStyle = `hsl(${hue}, 100%, 50%)`;
-    
-    const x = i % 32;
-    const y = Math.floor(i / 32);
-    heatmapCtx.fillRect(x, y, 1, 1);
-  }
+    // 2. Draw raw thermal pixels to the 32x24 canvas
+    for (let i = 0; i < 768; i++) {
+      const val = frame[i];
+      const norm = Math.max(0, Math.min(1, (val - minT) / (maxT - minT)));
 
-  // 3. Update the texture on the GPU
-  heatmapTexture.needsUpdate = true;
+      // Map intensity to HSL: 240 (Blue) to 0 (Red)
+      const hue = (0.66 - norm * 0.66) * 360;
+      heatmapCtx.fillStyle = `hsl(${hue}, 100%, 50%)`;
 
-  const now = Date.now();
-
-  // 4. Propagate the texture view through the slices with refined dissipation
-  heatSlices.forEach((slice, index) => {
-    const delay = index * HEAT_TIME_LAG_MS;
-    
-    // Only update this slice if enough time has passed (creates the ripple/wave effect)
-    if (now - slice.userData.lastUpdateTime < delay) return;
-
-    // --- REFINED DEPTH DECAY MATH ---
-    // Exponential decay: Intensity = Base * e^(-k * distance)
-    const decayFactor = Math.exp(-HEAT_DECAY_PER_SLICE * index);
-    
-    // 1. Opacity: How "thick" the heat air looks. 
-    // We want it to linger a bit even as it cools.
-    slice.material.opacity = HEAT_MAX_OPACITY * decayFactor;
-
-    // 2. Emissive Intensity: How much the heat "glows".
-    // Heat energy (glow) usually dissipates faster than the air density.
-    // We square the decay factor to make the glow drop off more sharply.
-    slice.material.emissiveIntensity = 0.6 * (decayFactor * decayFactor);
-    
-    // 3. Ensure the texture is mapped
-    if (!slice.material.map) {
-      slice.material.map = heatmapTexture;
-      slice.material.emissiveMap = heatmapTexture;
+      const x = i % 32;
+      const y = Math.floor(i / 32);
+      heatmapCtx.fillRect(x, y, 1, 1);
     }
 
-    slice.userData.lastUpdateTime = now;
-  });
-}
+    // 3. Update the texture on the GPU
+    heatmapTexture.needsUpdate = true;
+
+    const now = Date.now();
+
+    // 4. Propagate the texture view through the slices with refined dissipation
+    heatSlices.forEach((slice, index) => {
+      const delay = index * HEAT_TIME_LAG_MS;
+
+      // Only update this slice if enough time has passed (creates the ripple/wave effect)
+      if (now - slice.userData.lastUpdateTime < delay) return;
+
+      // --- REFINED DEPTH DECAY MATH ---
+      // Exponential decay: Intensity = Base * e^(-k * distance)
+      const decayFactor = Math.exp(-HEAT_DECAY_PER_SLICE * index);
+
+      // 1. Opacity: How "thick" the heat air looks.
+      // We want it to linger a bit even as it cools.
+      slice.material.opacity = HEAT_MAX_OPACITY * decayFactor;
+
+      // 2. Emissive Intensity: How much the heat "glows".
+      // Heat energy (glow) usually dissipates faster than the air density.
+      // We square the decay factor to make the glow drop off more sharply.
+      slice.material.emissiveIntensity = 0.6 * (decayFactor * decayFactor);
+
+      // 3. Ensure the texture is mapped
+      if (!slice.material.map) {
+        slice.material.map = heatmapTexture;
+        slice.material.emissiveMap = heatmapTexture;
+      }
+
+      slice.userData.lastUpdateTime = now;
+    });
+  }
 
   const ambient = new THREE.AmbientLight(0xffffff, 1);
   scene.add(ambient);
@@ -282,7 +280,7 @@ function updateHeatFromFrontSensor(frame) {
     map: heatmapTexture,
     side: THREE.DoubleSide,
     transparent: true,
-    opacity: 0.85
+    opacity: 0.85,
   });
 
   // Emissive to make it glow slightly
@@ -292,7 +290,7 @@ function updateHeatFromFrontSensor(frame) {
   // Plane geometry sized to front wall (Correctly scaled)
   const heatmapGeometry = new THREE.PlaneGeometry(
     ROOM_WIDTH * 0.9, // slightly smaller than wall width
-    WALL_HEIGHT * 0.9 // slightly smaller than wall height
+    WALL_HEIGHT * 0.9, // slightly smaller than wall height
   );
 
   // Heat Propagation configuration
@@ -300,8 +298,8 @@ function updateHeatFromFrontSensor(frame) {
   const HEAT_SLICE_DEPTH = ROOM_DEPTH / HEAT_SLICE_COUNT;
 
   // Controls realism
-  const HEAT_DECAY_PER_SLICE = 0.12;   // how much heat fades per depth
-  const HEAT_TIME_LAG_MS = 120;        // delay per slice (illusion of movement)
+  const HEAT_DECAY_PER_SLICE = 0.12; // how much heat fades per depth
+  const HEAT_TIME_LAG_MS = 120; // delay per slice (illusion of movement)
 
   // Heat slice configuration
   const HEAT_MAX_OPACITY = 0.85;
@@ -314,11 +312,11 @@ function updateHeatFromFrontSensor(frame) {
     const material = new THREE.MeshStandardMaterial({
       map: heatmapTexture,
       transparent: true,
-      opacity: 0.0,            // Start hidden until data arrives
+      opacity: 0.0, // Start hidden until data arrives
       side: THREE.DoubleSide,
-      emissive: 0xffffff,      // Set to white so the map colors shine through
+      emissive: 0xffffff, // Set to white so the map colors shine through
       emissiveMap: heatmapTexture,
-      emissiveIntensity: 0.0
+      emissiveIntensity: 0.0,
     });
 
     const slice = new THREE.Mesh(heatmapGeometry, material);
@@ -326,7 +324,7 @@ function updateHeatFromFrontSensor(frame) {
     slice.position.set(
       0,
       0.1,
-      FRONT_WALL_Z + DETACH_OFFSET + i * HEAT_SLICE_DEPTH
+      FRONT_WALL_Z + DETACH_OFFSET + i * HEAT_SLICE_DEPTH,
     );
 
     // Ensure layers render in order from back to front for correct transparency
@@ -334,7 +332,7 @@ function updateHeatFromFrontSensor(frame) {
 
     slice.userData = {
       lastUpdateTime: 0,
-      intensity: 0
+      intensity: 0,
     };
 
     heatSlices.push(slice);
@@ -346,9 +344,9 @@ function updateHeatFromFrontSensor(frame) {
 
   const loader = new GLTFLoader();
   loader.load(
-    'https://firebasestorage.googleapis.com/v0/b/dss-database-51609.firebasestorage.app/o/classroom.glb?alt=media&token=caa4c4ed-3241-4a78-95c5-b1ea4947832a',
+    "https://firebasestorage.googleapis.com/v0/b/dss-database-51609.firebasestorage.app/o/classroom.glb?alt=media&token=caa4c4ed-3241-4a78-95c5-b1ea4947832a",
     (gltf) => {
-      document.getElementById('loading-overlay').style.display = 'none';
+      document.getElementById("loading-overlay").style.display = "none";
       const model = gltf.scene;
       const box = new THREE.Box3().setFromObject(model);
       const center = box.getCenter(new THREE.Vector3());
@@ -357,12 +355,13 @@ function updateHeatFromFrontSensor(frame) {
     },
     undefined,
     (error) => {
-      console.error('GLB load error:', error);
-      document.getElementById('loading-overlay').textContent = 'Error Loading Model';
-    }
+      console.error("GLB load error:", error);
+      document.getElementById("loading-overlay").textContent =
+        "Error Loading Model";
+    },
   );
 
-  window.addEventListener('resize', () => {
+  window.addEventListener("resize", () => {
     camera.aspect = container.clientWidth / container.clientHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(container.clientWidth, container.clientHeight);
@@ -374,53 +373,50 @@ function updateHeatFromFrontSensor(frame) {
     renderer.render(scene, camera);
   }
 
-setInterval(() => {
+  setInterval(() => {
     const now = Date.now();
     const roomState = thermalDataByRoom[activeRoom];
 
     if (!roomState) return; // No data yet for this room
 
     // 1. WATCHDOG CHECK: Detect if data stopped flowing
-if (roomState.ready && now - roomState.lastUpdateTime > THERMAL_TIMEOUT_MS) {
-  if (!roomState.stale) {
-    roomState.stale = true;
-    console.warn(`Thermal watchdog: ${activeRoom} data stream stale`);
+    if (
+      roomState.ready &&
+      now - roomState.lastUpdateTime > THERMAL_TIMEOUT_MS
+    ) {
+      if (!roomState.stale) {
+        roomState.stale = true;
+        console.warn(`Thermal watchdog: ${activeRoom} data stream stale`);
 
-    heatSlices.forEach(slice => {
-      slice.material.opacity *= 0.3;
-      slice.material.emissiveIntensity = 0.01;
-    });
-
-    // ACTIVATE DASHBOARD FALLBACK
-    updateDashboard(
-      0,
-      0,
-      0,
-      'ESTIMATED (FALLBACK)',
-      ['Sensor offline. Showing last known safe estimate.']
-    );
-  }
-}
-
+        heatSlices.forEach((slice) => {
+          slice.material.opacity *= 0.3;
+          slice.material.emissiveIntensity = 0.01;
+        });
+      }
+    }
 
     // Heatmap visibility control
-    heatSlices.forEach(slice => {
+    heatSlices.forEach((slice) => {
       slice.visible = isHeatmapEnabled;
     });
 
     // 2. DRAW ONLY IF DATA IS FRESH AND HEATMAP IS ENABLED
-    if (isHeatmapEnabled && !roomState.stale && roomState.dirty && roomState.frame) {
+    if (
+      isHeatmapEnabled &&
+      !roomState.stale &&
+      roomState.dirty &&
+      roomState.frame
+    ) {
       updateHeatFromFrontSensor(roomState.frame);
       roomState.dirty = false;
     }
 
-
     // 3. RESTORE visuals if recovery is detected
     if (roomState.restoreVisual) {
       console.info(`Restoring volumetric visuals for ${activeRoom}`);
-      // On recovery, we don't need to manually set opacity; 
+      // On recovery, we don't need to manually set opacity;
       // the next updateHeatFromFrontSensor call will handle it.
-      roomState.dirty = true; 
+      roomState.dirty = true;
       roomState.restoreVisual = false;
     }
   }, 1000);
@@ -433,25 +429,25 @@ if (roomState.ready && now - roomState.lastUpdateTime > THERMAL_TIMEOUT_MS) {
  * ===================================================================== */
 
 function showAlertBanner(message) {
-  const banner = document.getElementById('alert-banner');
-  const msg = document.getElementById('alert-message');
+  const banner = document.getElementById("alert-banner");
+  const msg = document.getElementById("alert-message");
   msg.textContent = message;
-  banner.classList.remove('hidden');
-  banner.classList.add('show');
+  banner.classList.remove("hidden");
+  banner.classList.add("show");
 
   // Hide automatically after 5 seconds
   setTimeout(() => {
-    banner.classList.remove('show');
-    banner.classList.add('hidden');
+    banner.classList.remove("show");
+    banner.classList.add("hidden");
   }, 5000);
 }
 
 // Shift + N
 // Manual control for testing notification banner
-document.addEventListener('keydown', (e) => {
-  if (e.shiftKey && e.key === 'N') {
+document.addEventListener("keydown", (e) => {
+  if (e.shiftKey && e.key === "N") {
     // Press "shift + N" to trigger alert banner
-    showAlertBanner('⚠️WARNING: Heat index is greater than 41°C⚠️');
+    showAlertBanner("⚠️WARNING: Heat index is greater than 41°C⚠️");
   }
 });
 
@@ -460,14 +456,14 @@ document.addEventListener('keydown', (e) => {
  * ===================================================================== */
 
 function showPeakBanner() {
-  const banner = document.getElementById('peak-heat-banner');
-  banner.classList.remove('hidden');
-  banner.classList.add('show');
+  const banner = document.getElementById("peak-heat-banner");
+  banner.classList.remove("hidden");
+  banner.classList.add("show");
 
   // Hide automatically after 5 seconds
   setTimeout(() => {
-    banner.classList.remove('show');
-    banner.classList.add('hidden');
+    banner.classList.remove("show");
+    banner.classList.add("hidden");
   }, 5000);
 }
 
@@ -487,8 +483,8 @@ function checkPeakHeatHours() {
 
 // Shift + P
 // Manual control for testing peak heat hours banner
-document.addEventListener('keydown', (e) => {
-  if (e.shiftKey && e.key === 'P') {
+document.addEventListener("keydown", (e) => {
+  if (e.shiftKey && e.key === "P") {
     // Press "SHIFT + P" to trigger peak heat hours banner
     showPeakBanner();
   }
@@ -502,52 +498,52 @@ document.addEventListener('keydown', (e) => {
 function updateDashboard(temp, humidity, hi, label, advisory) {
   // Safety defaults (backend-first, frontend-safe)
   hi = Number(hi) || 0;
-  label = label || 'UNKNOWN';
+  label = label || "UNKNOWN";
 
   if (Array.isArray(advisory)) {
     // do nothing
-  } else if (typeof advisory === 'string') {
+  } else if (typeof advisory === "string") {
     advisory = [advisory];
   } else {
-    advisory = ['No advisory available'];
+    advisory = ["No advisory available"];
   }
 
-  document.getElementById('temp-val').textContent = temp.toFixed(1);
-  document.getElementById('hum-val').textContent = humidity.toFixed(1);
-  document.getElementById('hi-val').textContent = hi.toFixed(1);
+  document.getElementById("temp-val").textContent = temp.toFixed(1);
+  document.getElementById("hum-val").textContent = humidity.toFixed(1);
+  document.getElementById("hi-val").textContent = hi.toFixed(1);
 
   if (hi > 41) {
-    showAlertBanner('⚠️WARNING: Heat index is greater than 41°C⚠️');
+    showAlertBanner("⚠️WARNING: Heat index is greater than 41°C⚠️");
   }
 
   // Determine color per threshold
-  let color = 'black'; // default
+  let color = "black"; // default
 
   switch (label) {
-    case 'Caution':
-      color = 'green';
+    case "Caution":
+      color = "green";
       break;
-    case 'Extreme Caution':
-      color = 'yellow';
+    case "Extreme Caution":
+      color = "yellow";
       break;
-    case 'Danger':
-      color = 'orange';
+    case "Danger":
+      color = "orange";
       break;
-    case 'Extreme Danger':
-      color = 'red';
+    case "Extreme Danger":
+      color = "red";
       break;
-    case 'ESTIMATED (FALLBACK)':
-      color = 'gray';
+    case "ESTIMATED (FALLBACK)":
+      color = "gray";
       break;
   }
 
   // Update DSS title with styled label
-  document.getElementById('dss-title').innerHTML =
+  document.getElementById("dss-title").innerHTML =
     `Heat Index Advisory (Decision Support System): <span style="color:${color}; font-size:1.5em; font-weight:bold;">${label}</span>`;
 
   // Use Logic for Decision Support System
-  const dssBox = document.getElementById('dss-content');
-  dssBox.innerHTML = advisory.map((item) => `<p>• ${item}</p>`).join('');
+  const dssBox = document.getElementById("dss-content");
+  dssBox.innerHTML = advisory.map((item) => `<p>• ${item}</p>`).join("");
 }
 
 /* =====================================================================
@@ -559,45 +555,45 @@ let chartData = {
   labels: [],
   temp: [],
   hum: [],
-  hi: []
+  hi: [],
 };
 
 // Initialize the line-sparkline chart
 function initSparkline() {
-  const ctx = document.getElementById('sensorChart').getContext('2d');
+  const ctx = document.getElementById("sensorChart").getContext("2d");
   sensorChart = new Chart(ctx, {
-    type: 'line', // Line chart for sparkline
+    type: "line", // Line chart for sparkline
     data: {
       labels: chartData.labels,
       datasets: [
         {
-          label: 'Temperature (°C)',
+          label: "Temperature (°C)",
           data: chartData.temp,
-          borderColor: 'rgba(255,0,0,0.8)',
-          backgroundColor: 'rgba(255,0,0,0.2)',
+          borderColor: "rgba(255,0,0,0.8)",
+          backgroundColor: "rgba(255,0,0,0.2)",
           tension: 0.4, // smooth curves
           fill: false,
-          pointRadius: 5 // dot size
+          pointRadius: 5, // dot size
         },
         {
-          label: 'Humidity (hPa)',
+          label: "Humidity (hPa)",
           data: chartData.hum,
-          borderColor: 'rgba(0,0,255,0.8)',
-          backgroundColor: 'rgba(0,0,255,0.2)',
+          borderColor: "rgba(0,0,255,0.8)",
+          backgroundColor: "rgba(0,0,255,0.2)",
           tension: 0.4,
           fill: false,
-          pointRadius: 5
+          pointRadius: 5,
         },
         {
-          label: 'Heat Index (°C)',
+          label: "Heat Index (°C)",
           data: chartData.hi,
-          borderColor: 'rgba(255,165,0,0.8)',
-          backgroundColor: 'rgba(255,165,0,0.2)',
+          borderColor: "rgba(255,165,0,0.8)",
+          backgroundColor: "rgba(255,165,0,0.2)",
           tension: 0.4,
           fill: false,
-          pointRadius: 5
-        }
-      ]
+          pointRadius: 5,
+        },
+      ],
     },
     options: {
       responsive: true,
@@ -605,14 +601,14 @@ function initSparkline() {
       plugins: {
         legend: {
           display: true,
-          position: 'top'
-        }
+          position: "top",
+        },
       },
       scales: {
         x: { display: true }, // show/hide X axis
-        y: { beginAtZero: true } // Y axis starts at 0
-      }
-    }
+        y: { beginAtZero: true }, // Y axis starts at 0
+      },
+    },
   });
 }
 
@@ -635,14 +631,13 @@ function updateSparkline(temp, hum, hi) {
   if (sensorChart) sensorChart.update();
 }
 
-
 /* =====================================================================
  * 8. Firestore listener – Optimized for network fallback and per-room debounce
  * ===================================================================== */
 async function listenToData() {
   setInterval(async () => {
     try {
-      const BACKEND_URL = ("https://website-jbd4.onrender.com");
+      const BACKEND_URL = "https://website-jbd4.onrender.com";
       const res = await fetch(`${BACKEND_URL}/api/${activeRoom}`);
 
       if (!res.ok) {
@@ -654,8 +649,8 @@ async function listenToData() {
       if (!roomData) throw new Error("Invalid room data");
 
       const temp = Number(roomData.averageTemperature);
-      const hum  = Number(roomData.averageHumidity);
-      const hi   = Number(roomData.heatIndex);
+      const hum = Number(roomData.averageHumidity);
+      const hi = Number(roomData.heatIndex);
 
       if (isNaN(temp) || isNaN(hum) || isNaN(hi)) {
         throw new Error("Invalid numeric values");
@@ -663,8 +658,43 @@ async function listenToData() {
 
       backendDown = false;
 
-      updateDashboard(temp, hum, hi, roomData.label, roomData.advisory);
-      updateSparkline(temp, hum, hi);
+      const roomState = thermalDataByRoom[activeRoom];
+      const sensorsDown = !roomState || roomState.stale;
+
+      // NORMAL MODE only if backend OK and sensors OK
+      if (!backendDown && !sensorsDown) {
+        updateDashboard(temp, hum, hi, roomData.label, roomData.advisory);
+        updateSparkline(temp, hum, hi);
+
+      } else {
+        const fallbackHI = computeFallbackHeatIndex(temp, hum);
+
+        const fallbackAdvisory = [
+          "System partially unavailable.",
+          "Running in safe fallback mode.",
+          "Waiting for backend and sensors to recover.",
+        ];
+
+        updateDashboard(
+          temp,
+          hum,
+          fallbackHI,
+          "ESTIMATED (FALLBACK)",
+          fallbackAdvisory,
+        );
+
+        updateSparkline(temp, hum, fallbackHI);
+
+        updateAIContext({
+          temperature: temp,
+          humidity: hum,
+          heatIndex: fallbackHI,
+          label: "ESTIMATED (FALLBACK)",
+          advisory: fallbackAdvisory,
+          backendDown: backendDown,
+          sensorsDown: true,
+        });
+      }
 
       // Cache latest valid values
       latestAIContext = {
@@ -673,7 +703,7 @@ async function listenToData() {
         humidity: hum,
         heatIndex: hi,
         label: roomData.label,
-        advisory: roomData.advisory
+        advisory: roomData.advisory,
       };
 
       updateAIContext({
@@ -683,58 +713,55 @@ async function listenToData() {
         label: roomData.label,
         advisory: roomData.advisory,
         backendDown: false,
-        sensorsDown: false
+        sensorsDown: false,
       }); // Update AI chat context with latest data
-    
-} catch (err) {
-    if (!backendDown) {
-    console.warn("Backend unavailable — activating dashboard fallback");
-    backendDown = true;
-  }
+    } catch (err) {
+      if (!backendDown) {
+        console.warn("Backend unavailable — activating dashboard fallback");
+        backendDown = true;
+      }
 
-  let temp = latestAIContext.temperature;
-  let hum  = latestAIContext.humidity;
+      let temp = latestAIContext.temperature;
+      let hum = latestAIContext.humidity;
 
-  // If backend never succeeded yet,
-  // create safe baseline values instead of null
-  if (temp == null || hum == null) {
-    temp = 30;   // safe neutral baseline
-    hum  = 60;
-  }
+      // If backend never succeeded yet,
+      // create safe baseline values instead of null
+      if (temp == null || hum == null) {
+        temp = 30; // safe neutral baseline
+        hum = 60;
+      }
 
-  const fallbackHI = computeFallbackHeatIndex(temp, hum);
+      const fallbackHI = computeFallbackHeatIndex(temp, hum);
 
-  const fallbackAdvisory = [
-    "Backend Decision Support System unavailable.",
-    "Using local heat index estimation.",
-    "Values are safe approximations."
-  ];
+      const fallbackAdvisory = [
+        "Backend Decision Support System unavailable.",
+        "Using local heat index estimation.",
+        "Values are safe approximations.",
+      ];
 
-  updateDashboard(
-    temp,
-    hum,
-    fallbackHI,
-    "ESTIMATED (FALLBACK)",
-    fallbackAdvisory
-  );
+      updateDashboard(
+        temp,
+        hum,
+        fallbackHI,
+        "ESTIMATED (FALLBACK)",
+        fallbackAdvisory,
+      );
 
-  updateSparkline(temp, hum, fallbackHI);
+      updateSparkline(temp, hum, fallbackHI);
 
-  // 🔥 THIS WAS MISSING
-  updateAIContext({
-    temperature: temp,
-    humidity: hum,
-    heatIndex: fallbackHI,
-    label: "ESTIMATED (FALLBACK)",
-    advisory: fallbackAdvisory,
-    backendDown: true,
-    sensorsDown: false
-  });
-}
-
+      // 🔥 THIS WAS MISSING
+      updateAIContext({
+        temperature: temp,
+        humidity: hum,
+        heatIndex: fallbackHI,
+        label: "ESTIMATED (FALLBACK)",
+        advisory: fallbackAdvisory,
+        backendDown: true,
+        sensorsDown: false,
+      });
+    }
   }, 1000); // Poll every second for new data (adjust as needed)
 }
-
 
 /* =====================================================================
  * 9. Philippine Date & Time Display
@@ -742,51 +769,62 @@ async function listenToData() {
 
 async function updatePhilippineDateTime() {
   try {
-    const response = await fetch('https://worldtimeapi.org/api/timezone/Asia/Manila');
+    const response = await fetch(
+      "https://worldtimeapi.org/api/timezone/Asia/Manila",
+    );
 
     if (!response.ok) {
-      throw new Error('WorldTimeAPI request failed');
+      throw new Error("WorldTimeAPI request failed");
     }
 
     const data = await response.json();
     const dateTime = new Date(data.datetime);
 
     // Format time
-    const timeString = dateTime.toLocaleTimeString('en-PH', {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: true
+    const timeString = dateTime.toLocaleTimeString("en-PH", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
     });
 
     // Format date
-    const dateString = dateTime.toLocaleDateString('en-PH', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
+    const dateString = dateTime.toLocaleDateString("en-PH", {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
     });
 
-    document.getElementById('ph-time').textContent = timeString;
-    document.getElementById('ph-date').textContent = dateString;
+    document.getElementById("ph-time").textContent = timeString;
+    document.getElementById("ph-date").textContent = dateString;
   } catch (error) {
     if (!worldTimeApiFailed) {
-      console.warn('WorldTimeAPI unavailable. Falling back to local browser time.', error);
+      console.warn(
+        "WorldTimeAPI unavailable. Falling back to local browser time.",
+        error,
+      );
       worldTimeApiFailed = true; // Set flag to avoid repeated warnings
     }
 
     // Fallback: Browser time
     const now = new Date();
-    document.getElementById('ph-time').textContent = now.toLocaleTimeString('en-PH', {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: true
-    });
-    document.getElementById('ph-date').textContent = now.toLocaleDateString('en-PH', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
+    document.getElementById("ph-time").textContent = now.toLocaleTimeString(
+      "en-PH",
+      {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: true,
+      },
+    );
+    document.getElementById("ph-date").textContent = now.toLocaleDateString(
+      "en-PH",
+      {
+        weekday: "long",
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      },
+    );
   }
 }
 
@@ -802,21 +840,24 @@ window.onload = () => {
   setInterval(() => {
     const now = new Date();
 
-    document.getElementById('ph-time').textContent =
-      now.toLocaleTimeString('en-PH', {
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: true
-      });
+    document.getElementById("ph-time").textContent = now.toLocaleTimeString(
+      "en-PH",
+      {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: true,
+      },
+    );
 
-    document.getElementById('ph-date').textContent =
-      now.toLocaleDateString('en-PH', {
-        weekday: 'long',
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric'
-      });
-
+    document.getElementById("ph-date").textContent = now.toLocaleDateString(
+      "en-PH",
+      {
+        weekday: "long",
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      },
+    );
   }, 1000); // Update every second
 
   // Check for Peak Heat Hours on load
@@ -841,17 +882,16 @@ window.onload = () => {
   initAIChat();
 
   // Start listening to thermal data for all rooms
-  listenToThermal('room1');
-  listenToThermal('room2');
+  listenToThermal("room1");
+  listenToThermal("room2");
 
   // Heatmap toggle control
-const heatmapToggle = document.getElementById('heatmap-toggle');
+  const heatmapToggle = document.getElementById("heatmap-toggle");
 
-if (heatmapToggle) {
-  heatmapToggle.addEventListener('change', (e) => {
-    isHeatmapEnabled = e.target.checked;
-    console.log('Heatmap enabled:', isHeatmapEnabled);
-  });
-}
-
+  if (heatmapToggle) {
+    heatmapToggle.addEventListener("change", (e) => {
+      isHeatmapEnabled = e.target.checked;
+      console.log("Heatmap enabled:", isHeatmapEnabled);
+    });
+  }
 };

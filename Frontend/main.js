@@ -381,18 +381,27 @@ setInterval(() => {
     if (!roomState) return; // No data yet for this room
 
     // 1. WATCHDOG CHECK: Detect if data stopped flowing
-    if (roomState.ready && now - roomState.lastUpdateTime > THERMAL_TIMEOUT_MS) {
-      if (!roomState.stale) {
-        roomState.stale = true;
-        console.warn(`Thermal watchdog: ${activeRoom} data stream stale`);
-        
-        // Visually dim ALL slices to indicate connection loss
-        heatSlices.forEach(slice => {
-          slice.material.opacity *= 0.3; // Significantly dim the volume
-          slice.material.emissiveIntensity = 0.01;
-        });
-      }
-    }
+if (roomState.ready && now - roomState.lastUpdateTime > THERMAL_TIMEOUT_MS) {
+  if (!roomState.stale) {
+    roomState.stale = true;
+    console.warn(`Thermal watchdog: ${activeRoom} data stream stale`);
+
+    heatSlices.forEach(slice => {
+      slice.material.opacity *= 0.3;
+      slice.material.emissiveIntensity = 0.01;
+    });
+
+    // ACTIVATE DASHBOARD FALLBACK
+    updateDashboard(
+      0,
+      0,
+      0,
+      'ESTIMATED (FALLBACK)',
+      ['Sensor offline. Showing last known safe estimate.']
+    );
+  }
+}
+
 
     // Heatmap visibility control
     heatSlices.forEach(slice => {
@@ -494,7 +503,14 @@ function updateDashboard(temp, humidity, hi, label, advisory) {
   // Safety defaults (backend-first, frontend-safe)
   hi = Number(hi) || 0;
   label = label || 'UNKNOWN';
-  advisory = Array.isArray(advisory) ? advisory : ['No advisory available'];
+
+  if (Array.isArray(advisory)) {
+    // do nothing
+  } else if (typeof advisory === 'string') {
+    advisory = [advisory];
+  } else {
+    advisory = ['No advisory available'];
+  }
 
   document.getElementById('temp-val').textContent = temp.toFixed(1);
   document.getElementById('hum-val').textContent = humidity.toFixed(1);
@@ -508,7 +524,7 @@ function updateDashboard(temp, humidity, hi, label, advisory) {
   let color = 'black'; // default
 
   switch (label) {
-    case 'CAUTION':
+    case 'Caution':
       color = 'green';
       break;
     case 'EXTREME CAUTION':

@@ -48,9 +48,13 @@ Heat Index: ${context.heatIndex} °C
 
 Heat Index Advisory (Decision Support System): ${context.label}
 
-${context.advisory && context.advisory.length > 0
+${
+  Array.isArray(context.advisory)
     ? context.advisory.map(a => `- ${a}`).join("\n")
-    : "- No advisory available"}
+    : context.advisory
+      ? `- ${context.advisory}`
+      : "- No advisory available"
+}
 
 System Status: Sensors are down
 `;

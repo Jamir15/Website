@@ -75,10 +75,18 @@ body {
 
 .sidebar-left .nav-links {
     border-top: 2px solid var(--sidebar-dark-border);
-    margin-top: auto;
+    margin-top: 0;
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
+}
+
+.nav-section-title {
+    font-size: 0.82rem;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    color: var(--sidebar-dark-muted);
+    margin-bottom: 0.1rem;
 }
 
 .sidebar-left .nav-links a {
@@ -99,6 +107,10 @@ body {
 .sidebar-left .nav-links a.active {
     background-color: var(--sidebar-dark-active);
     font-weight: bold;
+}
+
+.view-hidden {
+    display: none !important;
 }
 
 /* DATE & TIME - LEFT SIDE PANEL */
@@ -139,6 +151,7 @@ body {
     border-bottom: 1px solid var(--sidebar-dark-border);
     border-radius: 8px;
     transition: background-color 0.2s ease, box-shadow 0.2s ease;
+    margin-top: auto;
 }
 
 .view-controls:hover {
@@ -258,6 +271,141 @@ body {
     grid-template-columns: 1fr;
     gap: 1rem;
     overflow-y: hidden;
+}
+
+#dashboard-view {
+    display: contents;
+}
+
+.settings-view {
+    background-color: var(--card-bg);
+    border: 1px solid var(--border-soft);
+    border-radius: 10px;
+    box-shadow: var(--shadow-soft);
+    padding: 1rem;
+    height: 100%;
+}
+
+.settings-header {
+    font-size: 1.3rem;
+    font-weight: 600;
+    color: var(--text-color);
+    text-align: left;
+    margin-bottom: 1rem;
+}
+
+.settings-option-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    border: 1px solid var(--border-soft);
+    border-radius: 10px;
+    padding: 0.75rem 0.9rem;
+    background-color: rgba(255, 255, 255, 0.42);
+}
+
+.settings-option-label {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--text-color);
+}
+
+.mode-toggle-row {
+    display: inline-flex;
+    align-items: center;
+    cursor: pointer;
+    user-select: none;
+}
+
+.mode-toggle-row input {
+    display: none;
+}
+
+.mode-toggle-switch {
+    width: 62px;
+    height: 28px;
+    border-radius: 999px;
+    position: relative;
+    background-color: #a9b9d1;
+    transition: background-color 0.25s ease, box-shadow 0.25s ease;
+    box-shadow: inset 0 0 0 1px rgba(9, 30, 55, 0.12);
+}
+
+.mode-toggle-switch::before {
+    content: "OFF";
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    color: #ffffff;
+    transition: opacity 0.2s ease;
+}
+
+.mode-toggle-switch::after {
+    content: "ON";
+    position: absolute;
+    left: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    color: #ffffff;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.mode-toggle-row input:checked + .mode-toggle-switch {
+    background-color: #274d83;
+    box-shadow: 0 0 0 3px rgba(39, 77, 131, 0.2);
+}
+
+.mode-toggle-row input:checked + .mode-toggle-switch::before {
+    opacity: 0;
+}
+
+.mode-toggle-row input:checked + .mode-toggle-switch::after {
+    opacity: 1;
+}
+
+body.dark-mode {
+    --bg-color: #0f1825;
+    --panel-bg: #16233a;
+    --text-color: #deebff;
+    --accent-color: #8eb9ff;
+    --card-bg: #1b2b43;
+    --border-soft: #314965;
+    --shadow-soft: 0 10px 22px rgba(4, 12, 22, 0.45);
+    --shadow-hover: 0 14px 28px rgba(7, 18, 36, 0.54);
+    --sidebar-dark-bg: #1a2b45;
+    --sidebar-dark-bg-2: #142238;
+    --sidebar-dark-border: #334d6d;
+    --sidebar-dark-text: #e6f0ff;
+    --sidebar-dark-muted: #adc2e0;
+    --sidebar-dark-hover: #2b4363;
+    --sidebar-dark-active: #36547b;
+}
+
+body.dark-mode {
+    background: radial-gradient(circle at top left, #213756 0%, #111b2b 45%, #0d1623 100%);
+}
+
+body.dark-mode .threejs-wrapper {
+    background: linear-gradient(180deg, #213856 0%, #17293f 100%);
+}
+
+body.dark-mode .chat-msg.ai {
+    background-color: #263950;
+    color: #e8f1ff;
+}
+
+body.dark-mode .chat-input-row input {
+    background-color: #111f33;
+    color: #deebff;
 }
 
 /* sensor cards */

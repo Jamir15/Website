@@ -420,6 +420,10 @@ body.dark-mode .card .value {
     color: #aecdff;
 }
 
+body.dark-mode #dss-card h3 {
+    color: #eef4ff;
+}
+
 /* sensor cards */
 .data-cards {
     display: grid;

@@ -134,6 +134,29 @@ function computeFallbackHeatIndex(tempC, humidity) {
 
 let activeRoom = "room1"; // default room
 let isHeatmapEnabled = true;
+let activeView = "dashboard";
+
+function setActiveView(viewName) {
+  const dashboardView = document.getElementById("dashboard-view");
+  const settingsView = document.getElementById("settings-view");
+  const aboutView = document.getElementById("about-view");
+  const menuLinks = document.querySelectorAll(".menu-link");
+
+  if (!dashboardView || !settingsView || !aboutView) return;
+
+  activeView = viewName;
+  const showSettings = viewName === "settings";
+  const showAbout = viewName === "about";
+
+  dashboardView.classList.toggle("view-hidden", showSettings || showAbout);
+  settingsView.classList.toggle("view-hidden", !showSettings);
+  aboutView.classList.toggle("view-hidden", !showAbout);
+
+  menuLinks.forEach((link) => {
+    const isActive = link.dataset.view === viewName;
+    link.classList.toggle("active", isActive);
+  });
+}
 
 function setupRoomClickHandlers() {
   const roomLinks = document.querySelectorAll(".room-link");
@@ -144,6 +167,7 @@ function setupRoomClickHandlers() {
       roomLinks.forEach((l) => l.classList.remove("active"));
       link.classList.add("active");
       activeRoom = link.dataset.room;
+      setActiveView("dashboard");
       console.log("Active room changed to:", activeRoom);
 
       document.getElementById("dss-content").innerHTML =
@@ -154,6 +178,46 @@ function setupRoomClickHandlers() {
         listenToThermal(activeRoom);
       }
     });
+  });
+}
+
+function setupMenuClickHandlers() {
+  const menuLinks = document.querySelectorAll(".menu-link");
+
+  menuLinks.forEach((link) => {
+    link.addEventListener("click", (e) => {
+      e.preventDefault();
+      const targetView = link.dataset.view;
+
+      if (targetView === "settings" || targetView === "about") {
+        setActiveView(targetView);
+      }
+    });
+  });
+}
+
+function setupDarkModeToggle() {
+  const darkModeToggle = document.getElementById("darkmode-toggle");
+  if (!darkModeToggle) return;
+
+  let darkEnabled = false;
+  try {
+    darkEnabled = localStorage.getItem("dashboard-theme") === "dark";
+  } catch (err) {
+    console.warn("Could not read theme preference.", err);
+  }
+
+  document.body.classList.toggle("dark-mode", darkEnabled);
+  darkModeToggle.checked = darkEnabled;
+
+  darkModeToggle.addEventListener("change", (e) => {
+    const enabled = e.target.checked;
+    document.body.classList.toggle("dark-mode", enabled);
+    try {
+      localStorage.setItem("dashboard-theme", enabled ? "dark" : "light");
+    } catch (err) {
+      console.warn("Could not save theme preference.", err);
+    }
   });
 }
 
@@ -865,6 +929,8 @@ window.onload = () => {
 
   // Setup Room Click Handlers
   setupRoomClickHandlers();
+  setupMenuClickHandlers();
+  setupDarkModeToggle();
 
   // Check every minute if it is still Peak Heat Hours
   // setInterval(checkPeakHeatHours, 60000); // 60000 ms = 1 minute
@@ -895,3 +961,4 @@ window.onload = () => {
     });
   }
 };
+

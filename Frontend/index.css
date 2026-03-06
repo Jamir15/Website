@@ -408,6 +408,18 @@ body.dark-mode .chat-input-row input {
     color: #deebff;
 }
 
+body.dark-mode .data-cards .card h3 {
+    color: #eef4ff;
+}
+
+body.dark-mode .card-emoji {
+    filter: saturate(1.05) brightness(1.08);
+}
+
+body.dark-mode .card .value {
+    color: #aecdff;
+}
+
 /* sensor cards */
 .data-cards {
     display: grid;

@@ -39,6 +39,8 @@
                  NOTIFICATIONS CONTAINER
             ============================ -->
             <div id="notifications-container">
+                <div class="nav-section-title">Notifications</div>
+
                 <!-- Heat Index Alert -->
                 <div id="alert-banner" class="notification hidden">
                     <p id="alert-message"></p>
@@ -46,7 +48,7 @@
 
                 <!-- Peak Heat Hours Reminder -->
                 <div id="peak-heat-banner" class="notification hidden">
-                    <p id="peak-heat-message">🌤️ Peak Heat Hours Reminder</p>
+                    <p id="peak-heat-message">&#x1F324;&#xFE0F; Peak Heat Hours Reminder</p>
                 </div>
             </div>
 
@@ -61,14 +63,23 @@
 
             <!-- ROOM NAVIGATION -->
             <nav class="nav-links">
+                <div class="nav-section-title">Rooms</div>
                 <a href="#" data-room="room1" class="room-link active">Room 1</a>
                 <a href="#" data-room="room2" class="room-link">Room 2</a>
+            </nav>
+
+            <!-- MENU NAVIGATION -->
+            <nav class="nav-links">
+                <div class="nav-section-title">Menu</div>
+                <a href="#" class="menu-link" data-view="settings">Settings</a>
+                <a href="#" class="menu-link" data-view="about">About</a>
             </nav>
         </aside>
 
 
         <!-- MAIN CONTENT AREA -->
         <main class="main-content">
+            <div id="dashboard-view">
 
             <!-- Middle Row: 3D Model + Chart -->
             <div class="threejs-chart-wrapper">
@@ -90,15 +101,15 @@
             <!-- SENSOR CARDS -->
             <div class="data-cards">
                 <div class="card">
-                    <h3>Temperature</h3>
+                    <h3><span class="card-emoji">&#x1F321;&#xFE0F;</span> Temperature</h3>
                     <div class="value"><span id="temp-val">--</span> °C</div>
                 </div>
                 <div class="card">
-                    <h3>Humidity</h3>
+                    <h3><span class="card-emoji">&#x1F4A7;</span> Humidity</h3>
                     <div class="value"><span id="hum-val">--</span> %</div>
                 </div>
                 <div class="card">
-                    <h3>Heat Index</h3>
+                    <h3><span class="card-emoji">&#x1F525;</span> Heat Index</h3>
                     <div class="value"><span id="hi-val">--</span> °C</div>
                 </div>
             </div>
@@ -113,6 +124,25 @@
                 </div>
                 <p id="dss-source">Based on CDRRMO Heat Index Threshold Guidelines</p>
             </div>
+
+            </div>
+
+            <!-- SETTINGS VIEW -->
+            <section id="settings-view" class="settings-view view-hidden">
+                <h2 class="settings-header">Settings</h2>
+                <div class="settings-option-row">
+                    <span class="settings-option-label">Dark Mode</span>
+                    <label class="mode-toggle-row">
+                        <input type="checkbox" id="darkmode-toggle">
+                        <span class="mode-toggle-switch" aria-hidden="true"></span>
+                    </label>
+                </div>
+            </section>
+
+            <!-- ABOUT VIEW -->
+            <section id="about-view" class="settings-view view-hidden">
+                <h2 class="settings-header">About</h2>
+            </section>
 
         </main>
 
@@ -142,3 +172,6 @@
     </script>
 </body>
 </html>
+
+
+

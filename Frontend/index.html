@@ -55,7 +55,7 @@
             <!-- VIEW CONTROLS -->
             <div class="view-controls">
                 <label class="toggle-row">
-                    <span class="toggle-label">🔥Heat Map</span>
+                    <span class="toggle-label">Heat Map</span>
                     <input type="checkbox" id="heatmap-toggle" checked>
                     <span class="toggle-switch"></span>
                 </label>
@@ -129,7 +129,7 @@
 
             <!-- SETTINGS VIEW -->
             <section id="settings-view" class="settings-view view-hidden">
-                <h2 class="settings-header">⚙️Settings</h2>
+                <h2 class="settings-header">Settings</h2>
                 <div class="settings-option-row">
                     <span class="settings-option-label">Dark Mode</span>
                     <label class="mode-toggle-row">
@@ -141,9 +141,171 @@
 
             <!-- ABOUT VIEW -->
             <section id="about-view" class="settings-view view-hidden">
-                <h2 class="settings-header">ⓘ About</h2>
+                <h2 class="settings-header">About the System</h2>
+                
+                <div class="about-content">
+                    <!-- System Overview -->
+                    <div class="about-section">
+                        <h3>🌡️ System Overview</h3>
+                        <p>The <strong>Classroom Evaluation Parametric Instrument and Digital Twin System</strong> is an integrated environmental monitoring platform designed to track, analyze, and visualize thermal conditions in real-time. The system combines IoT sensor networks, 3D digital twin visualization, and AI-powered decision support to ensure optimal indoor environmental quality.</p>
+                    </div>
+
+                    <!-- Peak Heat Hours -->
+                    <div class="about-section">
+                        <h3>⏰ Peak Heat Hours</h3>
+                        <p>The system monitors and alerts users during <strong>Peak Heat Hours</strong>, typically occurring between <strong>11:00 AM and 4:00 PM</strong> (11:00 - 16:00). During these hours, solar radiation is at its maximum, increasing the risk of heat-related stress even in indoor environments.</p>
+                        <div class="about-highlight">
+                            <strong>Alert Trigger:</strong> Automatic notification banner displays when current time falls within peak heat hours.
+                        </div>
+                    </div>
+
+                    <!-- Heat Index Formula -->
+                    <div class="about-section">
+                        <h3>🧮 Heat Index Calculation</h3>
+                        <p>The system uses the <strong>National Weather Service (NWS) Rothfusz Regression Formula</strong> for calculating the Heat Index, with fallback to the Steadman approximation for lower temperatures.</p>
+                        
+                        <div class="formula-box">
+                            <h4>Rothfusz Regression Formula:</h4>
+                            <code>
+HI = -42.379 + 2.04901523×T + 10.14333127×R 
+     - 0.22475541×T×R - 0.00683783×T² - 0.05481717×R² 
+     + 0.00122874×T²×R + 0.00085282×T×R² - 0.00000199×T²×R²
+                            </code>
+                            <p class="formula-note">Where: <strong>T</strong> = Temperature (°F), <strong>R</strong> = Relative Humidity (%), <strong>HI</strong> = Heat Index (°F)</p>
+                        </div>
+
+                        <div class="formula-conditions">
+                            <h4>Calculation Conditions:</h4>
+                            <ul>
+                                <li><strong>Below 20°C:</strong> Heat Index equals air temperature</li>
+                                <li><strong>20°C - 26.7°C:</strong> Steadman simple approximation</li>
+                                <li><strong>Above 26.7°C:</strong> Full Rothfusz regression with humidity adjustments</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- Heat Index Categories -->
+                    <div class="about-section">
+                        <h3>⚠️ Heat Index Categories & Advisories</h3>
+                        <div class="category-grid">
+                            <div class="category-card normal">
+                                <span class="category-label">Normal</span>
+                                <span class="category-range">&lt; 27°C</span>
+                                <p>Comfortable conditions. No heat-related risk.</p>
+                            </div>
+                            <div class="category-card caution">
+                                <span class="category-label">Caution</span>
+                                <span class="category-range">27°C - 32°C</span>
+                                <p>Fatigue possible with prolonged exposure.</p>
+                            </div>
+                            <div class="category-card extreme-caution">
+                                <span class="category-label">Extreme Caution</span>
+                                <span class="category-range">32°C - 41°C</span>
+                                <p>Heat cramps and heat exhaustion possible.</p>
+                            </div>
+                            <div class="category-card danger">
+                                <span class="category-label">Danger</span>
+                                <span class="category-range">41°C - 54°C</span>
+                                <p>Heat cramps likely. Heat exhaustion probable.</p>
+                            </div>
+                            <div class="category-card extreme-danger">
+                                <span class="category-label">Extreme Danger</span>
+                                <span class="category-range">&gt; 54°C</span>
+                                <p>Heat stroke highly likely with continued exposure.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Hardware Components -->
+                    <div class="about-section">
+                        <h3>🔧 Hardware Components</h3>
+                        <ul class="component-list">
+                            <li><strong>ESP32 Microcontroller</strong> - Main processing unit with WiFi/Bluetooth connectivity</li>
+                            <li><strong>AHT20 Sensor</strong> - Digital temperature and humidity measurement</li>
+                            <li><strong>MLX90640</strong> - 32×24 pixel thermal imaging array for heat mapping</li>
+                            <li><strong>TFT Display</strong> - Local real-time data visualization</li>
+                        </ul>
+                    </div>
+
+                    <!-- Software Stack -->
+                    <div class="about-section">
+                        <h3>💻 Software Architecture</h3>
+                        <div class="stack-grid">
+                            <div class="stack-item">
+                                <strong>Backend:</strong> Node.js, Express.js, Firebase Admin SDK
+                            </div>
+                            <div class="stack-item">
+                                <strong>Frontend:</strong> Three.js (3D), Chart.js (Graphs), Vanilla JavaScript
+                            </div>
+                            <div class="stack-item">
+                                <strong>Database:</strong> Firebase Firestore (Real-time NoSQL)</li>
+                            </div>
+                            <div class="stack-item">
+                                <strong>AI Service:</strong> OpenAI GPT-4o-mini for natural language explanations
+                            </div>
+                            <div class="stack-item">
+                                <strong>3D Assets:</strong> GLB/GLTF format classroom models
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Data Flow -->
+                    <div class="about-section">
+                        <h3>📡 Data Flow Architecture</h3>
+                        <ol class="flow-list">
+                            <li>Sensors (ESP32 + AHT20 + MLX90640) collect environmental data</li>
+                            <li>Data transmitted via WiFi to Firebase Firestore</li>
+                            <li>Backend server (Node.js/Express) processes and computes Heat Index</li>
+                            <li>3D Digital Twin receives thermal data for volumetric heat visualization</li>
+                            <li>Dashboard displays real-time metrics, charts, and AI-powered advisories</li>
+                            <li>AI Assistant provides contextual explanations based on current conditions</li>
+                        </ol>
+                    </div>
+
+                    <!-- Thermal Visualization -->
+                    <div class="about-section">
+                        <h3>🔥 Thermal Heatmap Visualization</h3>
+                        <p>The system employs <strong>volumetric heat propagation</strong> using 12 depth slices that simulate heat diffusion from the front wall into the classroom space. Each slice has:</p>
+                        <ul>
+                            <li>Exponential decay based on distance from source</li>
+                            <li>Time-lagged updates creating wave/ripple effects</li>
+                            <li>HSL color mapping (Blue → Red) for temperature gradients</li>
+                            <li>Emissive glow effects for realistic heat radiation</li>
+                        </ul>
+                    </div>
+
+                    <!-- Fallback Mechanisms -->
+                    <div class="about-section">
+                        <h3>🛡️ Fallback & Safety Mechanisms</h3>
+                        <ul>
+                            <li><strong>Backend Unavailable:</strong> Local heat index estimation using simplified formula</li>
+                            <li><strong>Sensor Timeout:</strong> 6-second watchdog timer with visual degradation</li>
+                            <li><strong>WorldTimeAPI Failure:</strong> Automatic fallback to browser local time</li>
+                            <li><strong>AI Service Down:</strong> Structured text response with current sensor values</li>
+                        </ul>
+                    </div>
+
+                    <!-- Multi-Room Support -->
+                    <div class="about-section">
+                        <h3>🏢 Multi-Room Architecture</h3>
+                        <p>The system supports monitoring multiple rooms simultaneously with independent:</p>
+                        <ul>
+                            <li>Sensor data streams (front and back sensors per room)</li>
+                            <li>Thermal imaging feeds (32×24 pixel arrays per room)</li>
+                            <li>Heat Index calculations and advisories per zone</li>
+                            <li>Real-time switching between rooms via navigation panel</li>
+                        </ul>
+                    </div>
+                </div>
             </section>
 
+            <!-- FOOTER -->
+            <footer class="dashboard-footer">
+                <div class="footer-content">
+                    <p class="footer-copyright">@2026 created by</p>
+                    <p class="footer-names">De Belen, Aguila, Alipala, Bosito, Tomalin</p>
+                </div>
+            </footer>
         </main>
 
         <!-- RIGHT SIDEBAR (AI CHAT) -->
@@ -172,7 +334,3 @@
     </script>
 </body>
 </html>
-
-
-
-

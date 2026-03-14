@@ -29,17 +29,20 @@
         <aside class="sidebar-left">
             <h2 class="sidebar-title">Dashboard</h2>
 
-            <!-- DATE & TIME DISPLAY -->
-            <div class="datetime-box">
-                <div id="ph-time">--:--</div>
-                <div id="ph-date">---, -- --- ----</div>
-            </div>
-
             <!-- ===========================
                  NOTIFICATIONS CONTAINER
             ============================ -->
             <div id="notifications-container">
                 <div class="nav-section-title">Notifications</div>
+
+                <!-- Condition (persistent) -->
+                <div id="condition-banner" class="notification show condition-normal">
+                    <p id="condition-title">✅ Normal</p>
+                    <p id="condition-desc">Comfortable condition</p>
+                </div>
+
+                <div class="notification-divider" aria-hidden="true"></div>
+                <div class="nav-section-title notification-subtitle">Alerts</div>
 
                 <!-- Heat Index Alert -->
                 <div id="alert-banner" class="notification hidden">
@@ -129,14 +132,27 @@
 
             <!-- SETTINGS VIEW -->
             <section id="settings-view" class="settings-view view-hidden">
-                <h2 class="settings-header">Settings</h2>
-                <div class="settings-option-row">
-                    <span class="settings-option-label">Dark Mode</span>
-                    <label class="mode-toggle-row">
-                        <input type="checkbox" id="darkmode-toggle">
-                        <span class="mode-toggle-switch" aria-hidden="true"></span>
-                    </label>
+                <header class="settings-view-header">
+                    <h2 class="settings-header">Settings</h2>
+                </header>
+
+                <div class="settings-view-body">
+                    <div class="settings-option-row">
+                        <span class="settings-option-label">Dark Mode</span>
+                        <label class="mode-toggle-row">
+                            <input type="checkbox" id="darkmode-toggle">
+                            <span class="mode-toggle-switch" aria-hidden="true"></span>
+                        </label>
+                    </div>
                 </div>
+
+                <!-- FOOTER -->
+                <footer class="dashboard-footer">
+                    <div class="footer-content">
+                        <p class="footer-copyright">@2026 created by</p>
+                        <p class="footer-names">De Belen, Aguila, Alipala, Bosito, Tomalin</p>
+                    </div>
+                </footer>
             </section>
 
             <!-- ABOUT VIEW -->
@@ -297,20 +313,21 @@ HI = -42.379 + 2.04901523×T + 10.14333127×R
                         </ul>
                     </div>
                 </div>
-            </section>
 
-            <!-- FOOTER -->
-            <footer class="dashboard-footer">
-                <div class="footer-content">
-                    <p class="footer-copyright">@2026 created by</p>
-                    <p class="footer-names">De Belen, Aguila, Alipala, Bosito, Tomalin</p>
-                </div>
-            </footer>
+                <!-- FOOTER -->
+                <footer class="dashboard-footer">
+                    <div class="footer-content">
+                        <p class="footer-copyright">@2026 created by</p>
+                        <p class="footer-names">De Belen, Aguila, Alipala, Bosito, Tomalin</p>
+                    </div>
+                </footer>
+            </section>
         </main>
 
         <!-- RIGHT SIDEBAR (AI CHAT) -->
         <aside class="sidebar-right">
             <div class="chat-header">AI Assistant</div>
+
             <div class="chat-container">
                 <div id="chat-messages"></div>
                 <div class="chat-input-row">
@@ -321,6 +338,12 @@ HI = -42.379 + 2.04901523×T + 10.14333127×R
                     />
                     <button id="chat-send">Send</button>
                 </div>
+            </div>
+
+            <!-- DATE & TIME DISPLAY -->
+            <div class="datetime-box">
+                <div id="ph-time">--:--</div>
+                <div id="ph-date">---, -- --- ----</div>
             </div>
         </aside>
 

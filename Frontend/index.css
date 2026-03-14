@@ -227,13 +227,32 @@ body {
     padding: 10px 16px;
     border-radius: 8px;
     font-weight: bold;
-    font-size: 0.9rem;
+    font-size: 0.82rem;
     color: white;
     box-shadow: 0 8px 16px rgba(0, 0, 0, 0.28);
     width: 100%; /* fit inside left sidebar */
+    overflow: hidden;
     opacity: 0;
     transform: translateY(20px);
     transition: opacity 0.35s ease, transform 0.35s ease, filter 0.2s ease;
+}
+
+.notification-divider {
+    height: 1px;
+    background: rgba(16, 50, 89, 0.18);
+    margin: 0.15rem 0;
+    border-radius: 999px;
+}
+
+.notification-subtitle {
+    margin-top: 0.1rem;
+}
+
+.notification p {
+    margin: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .notification:hover {
@@ -241,13 +260,76 @@ body {
 }
 
 /* Specific notification colors */
+#condition-banner.notification {
+    background-color: #2e9d5b;
+}
+
+#condition-banner.notification p {
+    display: inline;
+}
+
+#condition-banner #condition-title {
+    font-size: 0.86rem;
+}
+
+#condition-banner #condition-desc {
+    font-size: 0.78rem;
+    opacity: 0.95;
+    font-weight: 600;
+}
+
+#condition-banner #condition-desc::before {
+    content: "";
+    opacity: 0.85;
+}
+
+
+#condition-banner.condition-normal {
+    background-color: #2e9d5b;
+    color: #ffffff;
+}
+
+#condition-banner.condition-caution {
+    background-color: #f1c40f;
+    color: #10223a;
+}
+
+#condition-banner.condition-extreme-caution {
+    background-color: #ff8c00;
+    color: #ffffff;
+}
+
+#condition-banner.condition-danger {
+    background-color: #e74c3c;
+    color: #ffffff;
+}
+
+#condition-banner.condition-extreme-danger {
+    background-color: #b91c1c;
+    color: #ffffff;
+}
+
 #alert-banner.notification {
     background-color: rgb(255, 80, 80);
+    padding: 10px 16px;
+    font-size: 0.9rem;
 }
 
 #peak-heat-banner.notification {
     background-color: #ff8c00;
+    padding: 10px 16px;
+    font-size: 0.9rem;
 }
+
+/* Allow alert banners to show full message (multi-line) */
+#alert-banner.notification p,
+#peak-heat-banner.notification p {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+}
+
+/* Condition banner is persistent (never auto-hidden) */
 
 /* Show / Hide notifications */
 .notification.show {

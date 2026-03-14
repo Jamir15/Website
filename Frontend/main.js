@@ -558,6 +558,53 @@ document.addEventListener("keydown", (e) => {
  * 6. Dashboard updating
  * ===================================================================== */
 
+function updateConditionBanner(hi) {
+  const banner = document.getElementById("condition-banner");
+  const title = document.getElementById("condition-title");
+  const desc = document.getElementById("condition-desc");
+  if (!banner || !title || !desc) return;
+
+  const value = Number(hi);
+
+  let state = "condition-normal";
+  let titleText = "✅Normal";
+  let descText = "Comfortable condition";
+
+  if (value >= 54) {
+    state = "condition-extreme-danger";
+    titleText = "☠️Extreme Danger";
+    descText =
+      "Heat Index > 54°C";
+  } else if (value >= 41) {
+    state = "condition-danger";
+    titleText = "🔥Danger";
+    descText =
+      "Heat Index 41°C-54°C";
+  } else if (value >= 32) {
+    state = "condition-extreme-caution";
+    titleText = "🔥Extreme Caution";
+    descText =
+      "Heat Index 32°C-41°C";
+  } else if (value >= 27) {
+    state = "condition-caution";
+    titleText = "⚠️Caution";
+    descText =
+      "Heat Index 27°C-32°C";
+  }
+
+  banner.classList.remove(
+    "condition-normal",
+    "condition-caution",
+    "condition-extreme-caution",
+    "condition-danger",
+    "condition-extreme-danger",
+  );
+  banner.classList.add(state);
+
+  title.textContent = titleText;
+  desc.textContent = descText;
+}
+
 // Update dashboard values
 function updateDashboard(temp, humidity, hi, label, advisory) {
   // Safety defaults (backend-first, frontend-safe)
@@ -575,6 +622,8 @@ function updateDashboard(temp, humidity, hi, label, advisory) {
   document.getElementById("temp-val").textContent = temp.toFixed(1);
   document.getElementById("hum-val").textContent = humidity.toFixed(1);
   document.getElementById("hi-val").textContent = hi.toFixed(1);
+
+  updateConditionBanner(hi);
 
   if (hi > 41) {
     showAlertBanner("⚠️WARNING: Heat index is greater than 41°C⚠️");
@@ -961,4 +1010,3 @@ window.onload = () => {
     });
   }
 };
-

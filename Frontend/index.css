@@ -352,7 +352,9 @@ body {
     grid-template-rows: auto 1fr auto;
     grid-template-columns: 1fr;
     gap: 1rem;
-    overflow-y: hidden;
+    /* Allow scrolling when viewport height is too small to show all dashboard rows. */
+    overflow-y: auto;
+    min-height: 0;
 }
 
 #dashboard-view {
@@ -649,6 +651,20 @@ body.dark-mode #dss-card h3 {
 
 #dss-content p {
     font-size: 0.9rem;
+    display: block !important;
+    white-space: normal !important;
+    overflow: visible !important;
+    text-overflow: unset !important;
+    margin: 4px 0;
+    word-break: break-word;
+}
+
+#dss-content {
+    white-space: pre-line !important;
+    font-size: 0.9rem;
+    line-height: 1.35;
+    overflow: visible !important;
+    word-break: break-word;
 }
 
 #dss-source {

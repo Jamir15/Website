@@ -964,6 +964,58 @@ body.dark-mode #dss-card h3 {
     color: #721c24;
 }
 
+/* Threshold Data (PDF Reference) */
+.threshold-table-wrapper {
+    overflow-x: auto;
+    margin-top: 1rem;
+}
+
+.threshold-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+}
+
+.threshold-table th,
+.threshold-table td {
+    padding: 0.75rem;
+    border: 1px solid var(--border-soft);
+    vertical-align: top;
+    color: var(--text-color);
+}
+
+.threshold-table thead th {
+    background-color: rgba(16, 50, 89, 0.08);
+    text-align: left;
+    font-weight: 700;
+}
+
+.threshold-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.threshold-item {
+    background-color: rgba(255, 255, 255, 0.55);
+    border: 1px solid var(--border-soft);
+    border-radius: 10px;
+    padding: 1rem;
+}
+
+.threshold-note {
+    margin-bottom: 0;
+    font-size: 0.85rem;
+    opacity: 0.9;
+}
+
+.threshold-prepared {
+    margin-top: 1rem;
+    margin-bottom: 0;
+    font-size: 0.9rem;
+}
+
 /* Stack Grid */
 .stack-grid {
     display: grid;
@@ -1087,6 +1139,14 @@ body.dark-mode .about-section h3 {
 body.dark-mode .about-section p,
 body.dark-mode .about-section li {
     color: var(--text-color);
+}
+
+body.dark-mode .threshold-item {
+    background-color: rgba(30, 41, 59, 0.55);
+}
+
+body.dark-mode .threshold-table thead th {
+    background-color: rgba(255, 255, 255, 0.08);
 }
 
 body.dark-mode .formula-box {

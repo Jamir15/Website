@@ -166,6 +166,9 @@ async function getRoomSensorData(roomName) {
 
       label = getHeatIndexLabel(computedHeatIndex);
       advisory = getHeatIndexAdvisory(computedHeatIndex);
+
+      // Ensure advisory remains consistent for the frontend renderer
+      if (typeof advisory === "string") advisory = [advisory];
     }
 
     return {

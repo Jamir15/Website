@@ -760,20 +760,7 @@ function updateSparkline(temp, hum, hi) {
 async function listenToData() {
   setInterval(async () => {
     try {
-      const getBackendUrl = () => {
-        const params = new URLSearchParams(window.location.search);
-        const explicitUrl = params.get("backendUrl");
-        if (explicitUrl && /^https?:\/\//i.test(explicitUrl)) return explicitUrl;
-
-        const backend = params.get("backend");
-        if (backend && backend.toLowerCase() === "local") {
-          return "http://localhost:5000";
-        }
-
-        return "https://website-jbd4.onrender.com";
-      };
-
-      const BACKEND_URL = getBackendUrl();
+      const BACKEND_URL = "https://website-jbd4.onrender.com";
       const res = await fetch(`${BACKEND_URL}/api/${activeRoom}`);
 
       if (!res.ok) {

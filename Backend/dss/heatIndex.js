@@ -82,9 +82,9 @@ function getHeatIndexLabel(heatIndex) {
     if (heatIndex == null) return null;
 
     if (heatIndex < 27) return "Normal";
-    if (heatIndex < 32) return "Caution";
-    if (heatIndex < 41) return "Extreme Caution";
-    if (heatIndex < 54) return "Danger";
+    if (heatIndex < 33) return "Caution";
+    if (heatIndex < 42) return "Extreme Caution";
+    if (heatIndex < 52) return "Danger";
     return "Extreme Danger";
 }
 
@@ -92,18 +92,40 @@ function getHeatIndexAdvisory(heatIndex) {
     if (heatIndex == null) return null;
 
     if (heatIndex < 27)
-        return "Comfortable conditions. No heat-related risk.";
+        return ["Comfortable conditions. No heat-related risk."];
 
-    if (heatIndex < 32)
-        return "Fatigue possible with prolonged exposure.";
+    if (heatIndex < 33)
+        return [
+            "27°C – 32°C : CAUTION",
+            "• Possible: fatigue with prolonged exposure",
+            "• Low risk, but still uncomfortable"
+        ];
 
-    if (heatIndex < 41)
-        return "Heat cramps and heat exhaustion possible.";
+    if (heatIndex < 42)
+        return [
+            "33°C – 41°C : EXTREME CAUTION",
+            "• Higher chance of heat cramps",
+            "• Possible heat exhaustion",
+            "• Extra hydration and breaks needed",
+            "• Vulnerable groups (children, elderly) are more at risk"
+        ];
 
-    if (heatIndex < 54)
-        return "Heat cramps likely. Heat exhaustion probable.";
+    if (heatIndex < 52)
+        return [
+            "42°C – 51°C : DANGER",
+            "• Likely: heat cramps and heat exhaustion",
+            "• Heat stroke becomes possible with prolonged exposure",
+            "• Outdoor activities become risky",
+            "• This is often the reference point the City of Cabuyao use when considering",
+            "suspending classes"
+        ];
 
-    return "Heat stroke highly likely with continued exposure.";
+    return [
+        "52°C and above : EXTREME DANGER",
+        "• Heat stroke highly likely",
+        "• Very unsafe for outdoor activities and prolonged exposure",
+        "• Immediate protective measures required"
+    ];
 }
 
 module.exports = {

@@ -659,7 +659,14 @@ function updateDashboard(temp, humidity, hi, label, advisory) {
 
   // Use Logic for Decision Support System
   const dssBox = document.getElementById("dss-content");
-  dssBox.innerHTML = advisory.map((item) => `<p>${item}</p>`).join("");
+  // Render as separate lines (robust even if CSS whitespace rules don't apply).
+  dssBox.replaceChildren(
+    ...advisory.map((line) => {
+      const p = document.createElement("p");
+      p.textContent = String(line);
+      return p;
+    }),
+  );
 }
 
 /* =====================================================================

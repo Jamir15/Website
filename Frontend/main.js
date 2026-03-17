@@ -570,21 +570,21 @@ function updateConditionBanner(hi) {
   let titleText = "✅Normal";
   let descText = "Comfortable condition";
 
-  if (value >= 54) {
+  if (value >= 52) {
     state = "condition-extreme-danger";
     titleText = "☠️Extreme Danger";
     descText =
-      "Heat Index > 54°C";
-  } else if (value >= 41) {
+      "Heat Index 52°C and above";
+  } else if (value >= 42) {
     state = "condition-danger";
     titleText = "🔥Danger";
     descText =
-      "Heat Index 41°C-54°C";
-  } else if (value >= 32) {
+      "Heat Index 42°C-51°C";
+  } else if (value >= 33) {
     state = "condition-extreme-caution";
     titleText = "🔥Extreme Caution";
     descText =
-      "Heat Index 32°C-41°C";
+      "Heat Index 33°C-41°C";
   } else if (value >= 27) {
     state = "condition-caution";
     titleText = "⚠️Caution";
@@ -625,28 +625,31 @@ function updateDashboard(temp, humidity, hi, label, advisory) {
 
   updateConditionBanner(hi);
 
-  if (hi > 41) {
-    showAlertBanner("⚠️WARNING: Heat index is greater than 41°C⚠️");
+  if (hi >= 42) {
+    showAlertBanner("⚠️WARNING: Heat index is 42°C and above⚠️");
   }
 
   // Determine color per threshold
   let color = "black"; // default
 
   switch (label) {
+    case "Normal":
+      color = "#28a745";
+      break;
     case "Caution":
-      color = "green";
+      color = "#ffc107";
       break;
     case "Extreme Caution":
-      color = "yellow";
+      color = "#fd7e14";
       break;
     case "Danger":
-      color = "orange";
+      color = "#dc3545";
       break;
     case "Extreme Danger":
-      color = "red";
+      color = "#721c24";
       break;
     case "ESTIMATED (FALLBACK)":
-      color = "gray";
+      color = "#6b7280";
       break;
   }
 
@@ -656,7 +659,7 @@ function updateDashboard(temp, humidity, hi, label, advisory) {
 
   // Use Logic for Decision Support System
   const dssBox = document.getElementById("dss-content");
-  dssBox.innerHTML = advisory.map((item) => `<p>• ${item}</p>`).join("");
+  dssBox.innerHTML = advisory.map((item) => `<p>${item}</p>`).join("");
 }
 
 /* =====================================================================

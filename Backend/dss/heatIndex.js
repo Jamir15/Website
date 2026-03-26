@@ -83,7 +83,7 @@ function getHeatIndexLabel(heatIndex) {
 
     if (heatIndex < 27) return "Normal";
     if (heatIndex < 33) return "Caution";
-    if (heatIndex < 42) return "Extreme Caution";
+    if (heatIndex < 41.1) return "Extreme Caution";
     if (heatIndex < 52) return "Danger";
     return "Extreme Danger";
 }

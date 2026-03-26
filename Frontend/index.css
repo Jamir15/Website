@@ -1221,6 +1221,42 @@ body.dark-mode .about-section li {
     color: var(--text-color);
 }
 
+body.dark-mode .about-highlight {
+    background: linear-gradient(135deg, #3f2f0f 0%, #5a3d12 100%);
+    border-left-color: #f59e0b;
+    color: #fde68a;
+}
+
+body.dark-mode .category-card.normal {
+    background: linear-gradient(135deg, #133a2b 0%, #0f2e22 100%);
+    border-color: #22c55e;
+    color: #bbf7d0;
+}
+
+body.dark-mode .category-card.caution {
+    background: linear-gradient(135deg, #3d2d0a 0%, #2f2307 100%);
+    border-color: #f59e0b;
+    color: #fde68a;
+}
+
+body.dark-mode .category-card.extreme-caution {
+    background: linear-gradient(135deg, #40210a 0%, #331a08 100%);
+    border-color: #fb923c;
+    color: #fed7aa;
+}
+
+body.dark-mode .category-card.danger {
+    background: linear-gradient(135deg, #3f0f12 0%, #2f0b0d 100%);
+    border-color: #f87171;
+    color: #fecaca;
+}
+
+body.dark-mode .category-card.extreme-danger {
+    background: linear-gradient(135deg, #32090e 0%, #24070a 100%);
+    border-color: #ef4444;
+    color: #fecaca;
+}
+
 body.dark-mode .threshold-item {
     background-color: rgba(30, 41, 59, 0.55);
 }

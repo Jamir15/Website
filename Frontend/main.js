@@ -492,18 +492,28 @@ function initThreeJS() {
  * 4. Notification Banner for Extreme Heat Index
  * ===================================================================== */
 
-function showAlertBanner(message) {
+let isAlertBannerVisible = false;
+
+function setAlertBannerVisible(visible, message) {
   const banner = document.getElementById("alert-banner");
   const msg = document.getElementById("alert-message");
-  msg.textContent = message;
-  banner.classList.remove("hidden");
-  banner.classList.add("show");
+  if (!banner || !msg) return;
 
-  // Hide automatically after 5 seconds
-  setTimeout(() => {
+  if (visible) {
+    if (message) msg.textContent = message;
+    if (!isAlertBannerVisible) {
+      banner.classList.remove("hidden");
+      banner.classList.add("show");
+      isAlertBannerVisible = true;
+    }
+    return;
+  }
+
+  if (isAlertBannerVisible) {
     banner.classList.remove("show");
     banner.classList.add("hidden");
-  }, 5000);
+    isAlertBannerVisible = false;
+  }
 }
 
 // Shift + N
@@ -511,7 +521,10 @@ function showAlertBanner(message) {
 document.addEventListener("keydown", (e) => {
   if (e.shiftKey && e.key === "N") {
     // Press "shift + N" to trigger alert banner
-    showAlertBanner("⚠️WARNING: Heat index is greater than 41°C⚠️");
+    setAlertBannerVisible(
+      true,
+      "⚠️WARNING: Heat index is greater than 41°C⚠️",
+    );
   }
 });
 
@@ -519,16 +532,26 @@ document.addEventListener("keydown", (e) => {
  * 5. Notification Banner for Peak Heat Hours
  * ===================================================================== */
 
-function showPeakBanner() {
-  const banner = document.getElementById("peak-heat-banner");
-  banner.classList.remove("hidden");
-  banner.classList.add("show");
+let isPeakBannerVisible = false;
 
-  // Hide automatically after 5 seconds
-  setTimeout(() => {
+function setPeakBannerVisible(visible) {
+  const banner = document.getElementById("peak-heat-banner");
+  if (!banner) return;
+
+  if (visible) {
+    if (!isPeakBannerVisible) {
+      banner.classList.remove("hidden");
+      banner.classList.add("show");
+      isPeakBannerVisible = true;
+    }
+    return;
+  }
+
+  if (isPeakBannerVisible) {
     banner.classList.remove("show");
     banner.classList.add("hidden");
-  }, 5000);
+    isPeakBannerVisible = false;
+  }
 }
 
 // Logic to show the peak heat hours banner
@@ -536,13 +559,10 @@ function checkPeakHeatHours() {
   const now = new Date();
   const hour = now.getHours(); // 0-23
 
-  if (hour >= 11 && hour < 16) {
-    // 11 AM – 4 PM
-    showPeakBanner();
-    return true;
-  }
+  const inPeakHours = hour >= 11 && hour < 16;
+  setPeakBannerVisible(inPeakHours);
 
-  return false;
+  return inPeakHours;
 }
 
 // Shift + P
@@ -550,7 +570,7 @@ function checkPeakHeatHours() {
 document.addEventListener("keydown", (e) => {
   if (e.shiftKey && e.key === "P") {
     // Press "SHIFT + P" to trigger peak heat hours banner
-    showPeakBanner();
+    setPeakBannerVisible(true);
   }
 });
 
@@ -625,8 +645,14 @@ function updateDashboard(temp, humidity, hi, label, advisory) {
 
   updateConditionBanner(hi);
 
-  if (hi >= 42) {
-    showAlertBanner("⚠️WARNING: Heat index is 42°C and above⚠️");
+  const shouldShowAlert = hi > 41;
+  if (shouldShowAlert) {
+    setAlertBannerVisible(
+      true,
+      "Warning: Heat Index is greater than 41 degree Celsius",
+    );
+  } else {
+    setAlertBannerVisible(false);
   }
 
   // Determine color per threshold
@@ -992,7 +1018,7 @@ window.onload = () => {
   setupDarkModeToggle();
 
   // Check every minute if it is still Peak Heat Hours
-  // setInterval(checkPeakHeatHours, 60000); // 60000 ms = 1 minute
+    setInterval(checkPeakHeatHours, 60000); // 60000 ms = 1 minute
 
   // Initialize Three.js viewer
   initThreeJS();

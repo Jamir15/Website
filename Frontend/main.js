@@ -493,6 +493,7 @@ function initThreeJS() {
  * ===================================================================== */
 
 let isAlertBannerVisible = false;
+let alertBannerAutoHideTimer = null;
 
 function setAlertBannerVisible(visible, message) {
   const banner = document.getElementById("alert-banner");
@@ -500,6 +501,10 @@ function setAlertBannerVisible(visible, message) {
   if (!banner || !msg) return;
 
   if (visible) {
+    if (alertBannerAutoHideTimer) {
+      clearTimeout(alertBannerAutoHideTimer);
+      alertBannerAutoHideTimer = null;
+    }
     if (message) msg.textContent = message;
     if (!isAlertBannerVisible) {
       banner.classList.remove("hidden");
@@ -514,6 +519,11 @@ function setAlertBannerVisible(visible, message) {
     banner.classList.add("hidden");
     isAlertBannerVisible = false;
   }
+
+  if (alertBannerAutoHideTimer) {
+    clearTimeout(alertBannerAutoHideTimer);
+    alertBannerAutoHideTimer = null;
+  }
 }
 
 // Shift + N
@@ -521,10 +531,19 @@ function setAlertBannerVisible(visible, message) {
 document.addEventListener("keydown", (e) => {
   if (e.shiftKey && e.key === "N") {
     // Press "shift + N" to trigger alert banner
+    const currentHi = Number(latestAIContext.heatIndex);
+    const shouldPersist = !Number.isNaN(currentHi) && currentHi > 41;
+
     setAlertBannerVisible(
       true,
-      "⚠️WARNING: Heat index is greater than 41°C⚠️",
+      "Warning: Heat Index is greater than 41 degree Celsius",
     );
+
+    if (!shouldPersist) {
+      alertBannerAutoHideTimer = setTimeout(() => {
+        setAlertBannerVisible(false);
+      }, 30000);
+    }
   }
 });
 
@@ -533,12 +552,17 @@ document.addEventListener("keydown", (e) => {
  * ===================================================================== */
 
 let isPeakBannerVisible = false;
+let peakBannerAutoHideTimer = null;
 
 function setPeakBannerVisible(visible) {
   const banner = document.getElementById("peak-heat-banner");
   if (!banner) return;
 
   if (visible) {
+    if (peakBannerAutoHideTimer) {
+      clearTimeout(peakBannerAutoHideTimer);
+      peakBannerAutoHideTimer = null;
+    }
     if (!isPeakBannerVisible) {
       banner.classList.remove("hidden");
       banner.classList.add("show");
@@ -551,6 +575,11 @@ function setPeakBannerVisible(visible) {
     banner.classList.remove("show");
     banner.classList.add("hidden");
     isPeakBannerVisible = false;
+  }
+
+  if (peakBannerAutoHideTimer) {
+    clearTimeout(peakBannerAutoHideTimer);
+    peakBannerAutoHideTimer = null;
   }
 }
 
@@ -570,7 +599,13 @@ function checkPeakHeatHours() {
 document.addEventListener("keydown", (e) => {
   if (e.shiftKey && e.key === "P") {
     // Press "SHIFT + P" to trigger peak heat hours banner
-    setPeakBannerVisible(true);
+    const inPeakHours = checkPeakHeatHours();
+    if (!inPeakHours) {
+      setPeakBannerVisible(true);
+      peakBannerAutoHideTimer = setTimeout(() => {
+        setPeakBannerVisible(false);
+      }, 30000);
+    }
   }
 });
 
@@ -898,7 +933,7 @@ async function listenToData() {
 
       updateSparkline(temp, hum, fallbackHI);
 
-      // 🔥 THIS WAS MISSING
+      // Even if backend is down, we can still provide the AI chat with the latest known context
       updateAIContext({
         temperature: temp,
         humidity: hum,

@@ -487,6 +487,48 @@ body {
     box-shadow: 0 4px 10px rgba(29, 79, 174, 0.25);
 }
 
+.settings-action-button:disabled {
+    cursor: not-allowed;
+    opacity: 0.7;
+    box-shadow: none;
+}
+
+/* Toast */
+.ui-toast {
+    position: fixed;
+    right: 1.5rem;
+    bottom: 1.5rem;
+    padding: 0.75rem 1rem;
+    border-radius: 12px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #ffffff;
+    background: rgba(17, 24, 39, 0.92);
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.28);
+    transform: translateY(16px);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    z-index: 2000;
+}
+
+.ui-toast--show {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.ui-toast--success {
+    background: linear-gradient(135deg, #16a34a 0%, #15803d 100%);
+}
+
+.ui-toast--error {
+    background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+}
+
+.ui-toast--info {
+    background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+}
+
 .mode-toggle-row {
     display: inline-flex;
     align-items: center;
@@ -945,12 +987,6 @@ canvas {
     padding: 1.25rem;
     margin-bottom: 1.5rem;
     box-shadow: var(--shadow-soft);
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
-
-.about-section:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-hover);
 }
 
 .about-section h3 {
@@ -1038,11 +1074,6 @@ canvas {
     border-radius: 10px;
     border: 2px solid;
     text-align: center;
-    transition: transform 0.2s ease;
-}
-
-.category-card:hover {
-    transform: scale(1.02);
 }
 
 .category-card .category-label {

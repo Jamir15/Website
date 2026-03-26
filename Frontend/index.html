@@ -152,7 +152,13 @@
                             <span class="settings-emoji" role="img" aria-label="Export historical data logs">📥</span>
                             Export Historical Data Logs
                         </span>
-                        <button type="button" class="settings-action-button">Download</button>
+                        <button
+                            type="button"
+                            class="settings-action-button" id="export-logs-button"
+                            onclick="exportHistoricalLogs()"
+                        >
+                            Download
+                        </button>
                     </div>
                 </div>
 
@@ -222,22 +228,22 @@ HI = -42.379 + 2.04901523×T + 10.14333127×R
                             <div class="category-card caution">
                                 <span class="category-label">Caution</span>
                                 <span class="category-range">27°C - 32°C</span>
-                                <p>Fatigue possible with prolonged exposure.</p>
+                                <p>Possible: fatigue with prolonged exposure. Low risk, but still uncomfortable.</p>
                             </div>
                             <div class="category-card extreme-caution">
                                 <span class="category-label">Extreme Caution</span>
-                                <span class="category-range">32°C - 41°C</span>
-                                <p>Heat cramps and heat exhaustion possible.</p>
+                                <span class="category-range">33°C - 41°C</span>
+                                <p>Higher chance of heat cramps. Possible heat exhaustion. Extra hydration and breaks needed. Vulnerable groups (children, elderly) are more at risk.</p>
                             </div>
                             <div class="category-card danger">
                                 <span class="category-label">Danger</span>
-                                <span class="category-range">41°C - 54°C</span>
-                                <p>Heat cramps likely. Heat exhaustion probable.</p>
+                                <span class="category-range">42°C - 51°C</span>
+                                <p>Likely: heat cramps and heat exhaustion. Heat stroke becomes possible with prolonged exposure. Outdoor activities become risky. This is often the reference point the City of Cabuyao use when considering suspending classes.</p>
                             </div>
                             <div class="category-card extreme-danger">
                                 <span class="category-label">Extreme Danger</span>
-                                <span class="category-range">&gt; 54°C</span>
-                                <p>Heat stroke highly likely with continued exposure.</p>
+                                <span class="category-range">52°C and above</span>
+                                <p>Heat stroke highly likely. Very unsafe for outdoor activities and prolonged exposure. Immediate protective measures required.</p>
                             </div>
                         </div>
                     </div>
@@ -264,13 +270,13 @@ HI = -42.379 + 2.04901523×T + 10.14333127×R
                                     <tr>
                                         <td>27&deg;C &ndash; 32&deg;C</td>
                                         <td><strong>Caution</strong></td>
-                                        <td>Possible fatigue with prolonged exposure. Low risk, but still uncomfortable.</td>
+                                        <td>Possible: fatigue with prolonged exposure. Low risk, but still uncomfortable.</td>
                                     </tr>
                                     <tr>
                                         <td>33&deg;C &ndash; 41&deg;C</td>
                                         <td><strong>Extreme Caution</strong></td>
                                         <td>
-                                            Higher chance of heat cramps; possible heat exhaustion. Extra hydration and breaks needed.
+                                            Higher chance of heat cramps. Possible heat exhaustion. Extra hydration and breaks needed.
                                             Vulnerable groups (children, elderly) are more at risk.
                                         </td>
                                     </tr>
@@ -278,12 +284,12 @@ HI = -42.379 + 2.04901523×T + 10.14333127×R
                                         <td>42&deg;C &ndash; 51&deg;C</td>
                                         <td><strong>Danger</strong></td>
                                         <td>
-                                            Likely heat cramps and heat exhaustion. Heat stroke becomes possible with prolonged exposure.
-                                            Outdoor activities become risky. Often used as a reference point when considering suspending classes.
+                                            Likely: heat cramps and heat exhaustion. Heat stroke becomes possible with prolonged exposure.
+                                            Outdoor activities become risky. This is often the reference point the City of Cabuyao use when considering suspending classes.
                                         </td>
                                     </tr>
                                     <tr>
-                                        <td>&ge; 52&deg;C</td>
+                                        <td>52&deg;C and above</td>
                                         <td><strong>Extreme Danger</strong></td>
                                         <td>
                                             Heat stroke highly likely. Very unsafe for outdoor activities and prolonged exposure.

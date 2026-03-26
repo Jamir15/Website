@@ -8,12 +8,14 @@
  *  - Compute heat index
  *  - Process thermal frame
  *  - Return unified room response
+ *  - Export historical data logs to Excel on demand
  * ============================================================
  */
 
 const express = require("express");
 const admin = require("firebase-admin");
 const cors = require("cors");
+const ExcelJS = require("exceljs");
 const {
   computeHeatIndex,
   getHeatIndexLabel,
@@ -83,6 +85,34 @@ function processThermalData(docData) {
     min,
     max,
   };
+}
+
+/**
+ * Normalize Firestore timestamp to ISO string
+ */
+function formatFirestoreTimestamp(timestampValue) {
+  if (!timestampValue) return "";
+
+  if (typeof timestampValue.toDate === "function") {
+    return timestampValue.toDate().toISOString();
+  }
+
+  if (timestampValue instanceof Date) {
+    return timestampValue.toISOString();
+  }
+
+  if (typeof timestampValue === "string") {
+    return timestampValue;
+  }
+
+  if (
+    typeof timestampValue === "object" &&
+    typeof timestampValue._seconds === "number"
+  ) {
+    return new Date(timestampValue._seconds * 1000).toISOString();
+  }
+
+  return "";
 }
 
 /**
@@ -161,13 +191,10 @@ async function getRoomSensorData(roomName) {
     let advisory = null;
 
     if (avgTemperature !== null && avgHumidity !== null) {
-      // If below NOAA threshold, heat index equals air temp
       computedHeatIndex = computeHeatIndex(avgTemperature, avgHumidity);
-
       label = getHeatIndexLabel(computedHeatIndex);
       advisory = getHeatIndexAdvisory(computedHeatIndex);
 
-      // Ensure advisory remains consistent for the frontend renderer
       if (typeof advisory === "string") advisory = [advisory];
     }
 
@@ -219,6 +246,62 @@ async function buildRoomResponse(roomName) {
     thermal: thermalData,
     timestamp: Date.now(), // Backend timestamp
   };
+}
+
+/**
+ * Get historical logs for one Firestore collection
+ */
+async function getHistoricalLogs(collectionName) {
+  try {
+    const snapshot = await db
+      .collection(collectionName)
+      .orderBy("timestamp", "asc")
+      .get();
+
+    return snapshot.docs.map((doc) => {
+      const data = doc.data();
+
+      return {
+        docId: doc.id,
+        temperature:
+          typeof data.Temperature === "number" ? data.Temperature : "",
+        humidity: typeof data.Humidity === "number" ? data.Humidity : "",
+        timestamp: formatFirestoreTimestamp(data.timestamp),
+      };
+    });
+  } catch (error) {
+    console.error(`❌ Error fetching historical logs for ${collectionName}:`, error);
+    throw error;
+  }
+}
+
+/**
+ * Add one worksheet for one historical logs collection
+ */
+function addHistoricalWorksheet(workbook, sheetName, rows) {
+  const worksheet = workbook.addWorksheet(sheetName);
+
+  worksheet.columns = [
+    { header: "Document ID", key: "docId", width: 28 },
+    { header: "Timestamp", key: "timestamp", width: 28 },
+    { header: "Temperature (°C)", key: "temperature", width: 18 },
+    { header: "Humidity (%)", key: "humidity", width: 15 },
+  ];
+
+  worksheet.getRow(1).font = { bold: true };
+  worksheet.views = [{ state: "frozen", ySplit: 1 }];
+
+  if (rows.length === 0) {
+    worksheet.addRow({
+      docId: "",
+      timestamp: "No data available",
+      temperature: "",
+      humidity: "",
+    });
+    return;
+  }
+
+  rows.forEach((row) => worksheet.addRow(row));
 }
 
 // ------------------------------------------------------------
@@ -283,6 +366,47 @@ app.post("/api/ai/heat-index", async (req, res) => {
     console.error("❌ AI Route error:", error);
     return res.status(500).json({
       error: "AI processing failed.",
+    });
+  }
+});
+
+// * GET Export Historical Logs to Excel
+app.get("/api/export/historical-logs/excel", async (req, res) => {
+  try {
+    const workbook = new ExcelJS.Workbook();
+
+    workbook.creator = "Smart Building Monitoring System";
+    workbook.created = new Date();
+    workbook.modified = new Date();
+
+    const collections = [
+      { collection: "room1_front_logs", sheet: "Room1 Front Logs" },
+      { collection: "room1_back_logs", sheet: "Room1 Back Logs" },
+      { collection: "room2_front_logs", sheet: "Room2 Front Logs" },
+      { collection: "room2_back_logs", sheet: "Room2 Back Logs" },
+    ];
+
+    for (const item of collections) {
+      const rows = await getHistoricalLogs(item.collection);
+      addHistoricalWorksheet(workbook, item.sheet, rows);
+    }
+
+    const buffer = await workbook.xlsx.writeBuffer();
+
+    res.setHeader(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    );
+    res.setHeader(
+      "Content-Disposition",
+      'attachment; filename="historical_data_logs.xlsx"'
+    );
+
+    return res.send(Buffer.from(buffer));
+  } catch (error) {
+    console.error("❌ Export route error:", error);
+    return res.status(500).json({
+      error: "Failed to export historical data logs.",
     });
   }
 });

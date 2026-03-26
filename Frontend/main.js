@@ -14,6 +14,31 @@ import { initAIChat, updateAIContext } from "./chatAi.js";
 let backendDown = false;
 
 Chart.register(...registerables);
+const BACKEND_URL = "https://website-jbd4.onrender.com";
+
+/* =====================================================================
+ * UI Helpers (Toast + Download State)
+ * ===================================================================== */
+
+function showToast(message, variant = "info") {
+  let toast = document.getElementById("ui-toast");
+
+  if (!toast) {
+    toast = document.createElement("div");
+    toast.id = "ui-toast";
+    toast.className = "ui-toast";
+    document.body.appendChild(toast);
+  }
+
+  toast.textContent = message;
+  toast.classList.remove("ui-toast--info", "ui-toast--success", "ui-toast--error");
+  toast.classList.add(`ui-toast--${variant}`);
+  toast.classList.add("ui-toast--show");
+
+  setTimeout(() => {
+    toast.classList.remove("ui-toast--show");
+  }, 3500);
+}
 
 /* =====================================================================
  * AI SHARED STATE (latest sensor snapshot)
@@ -532,11 +557,11 @@ document.addEventListener("keydown", (e) => {
   if (e.shiftKey && e.key === "N") {
     // Press "shift + N" to trigger alert banner
     const currentHi = Number(latestAIContext.heatIndex);
-    const shouldPersist = !Number.isNaN(currentHi) && currentHi > 41;
+    const shouldPersist = !Number.isNaN(currentHi) && currentHi >= 41.1;
 
     setAlertBannerVisible(
       true,
-      "Warning: Heat Index is greater than 41 degree Celsius",
+      "⚠️Warning: Heat Index is greater than 41°C", 
     );
 
     if (!shouldPersist) {
@@ -680,11 +705,11 @@ function updateDashboard(temp, humidity, hi, label, advisory) {
 
   updateConditionBanner(hi);
 
-  const shouldShowAlert = hi > 41;
+  const shouldShowAlert = hi >= 41.1;
   if (shouldShowAlert) {
     setAlertBannerVisible(
       true,
-      "Warning: Heat Index is greater than 41 degree Celsius",
+      "⚠️Warning: Heat Index is greater than 41°C",
     );
   } else {
     setAlertBannerVisible(false);
@@ -821,7 +846,6 @@ function updateSparkline(temp, hum, hi) {
 async function listenToData() {
   setInterval(async () => {
     try {
-      const BACKEND_URL = "https://website-jbd4.onrender.com";
       const res = await fetch(`${BACKEND_URL}/api/${activeRoom}`);
 
       if (!res.ok) {
@@ -1070,6 +1094,42 @@ window.onload = () => {
   // Start listening to thermal data for all rooms
   listenToThermal("room1");
   listenToThermal("room2");
+
+  // Export historical data logs (download Excel)
+  const exportLogsButton = document.getElementById("export-logs-button");
+  if (exportLogsButton) {
+    exportLogsButton.addEventListener("click", async () => {
+      const url = `${BACKEND_URL}/api/export/historical-logs/excel`;
+      const originalLabel = exportLogsButton.textContent;
+
+      exportLogsButton.disabled = true;
+      exportLogsButton.textContent = "Downloading...";
+
+      try {
+        const res = await fetch(url);
+        if (!res.ok) {
+          throw new Error(`Export failed (${res.status})`);
+        }
+
+        const blob = await res.blob();
+        const downloadUrl = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = downloadUrl;
+        link.download = "historical_data_logs.xlsx";
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(downloadUrl);
+        showToast("Download started.", "success");
+      } catch (err) {
+        console.error("Export download error:", err);
+        showToast("Failed to download logs. Please try again.", "error");
+      } finally {
+        exportLogsButton.disabled = false;
+        exportLogsButton.textContent = originalLabel;
+      }
+    });
+  }
 
   // Heatmap toggle control
   const heatmapToggle = document.getElementById("heatmap-toggle");

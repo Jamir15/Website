@@ -4,7 +4,7 @@
  * ============================================================
  * Responsibilities:
  *  - Read sensor data from Firestore
- *  - Compute average temperature & humidity
+ *  - Compute average temperature & humidity for Room 1
  *  - Compute heat index
  *  - Process thermal frame
  *  - Return unified room response
@@ -15,6 +15,7 @@
 const express = require("express");
 const admin = require("firebase-admin");
 const cors = require("cors");
+const compression = require("compression");
 const ExcelJS = require("exceljs");
 const {
   computeHeatIndex,
@@ -25,14 +26,15 @@ require("dotenv").config();
 const { getHeatIndexAIResponse } = require("./services/openaiService");
 
 // ------------------------------------------------------------
-// 🔹 Initialize Express App
+// Initialize Express App
 // ------------------------------------------------------------
 const app = express();
+app.use(compression()); // Enable gzip compression for weak WiFi
 app.use(cors());
 app.use(express.json());
 
 // ------------------------------------------------------------
-// 🔹 Initialize Firebase Admin SDK
+// Initialize Firebase Admin SDK
 // ------------------------------------------------------------
 const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
 
@@ -43,49 +45,29 @@ admin.initializeApp({
 const db = admin.firestore();
 
 // ------------------------------------------------------------
-// 🔹 Utility Functions
+// Constants
 // ------------------------------------------------------------
+const ROOM1_SENSOR_DOCS = [
+  { position: "front", docId: "room1_front" },
+  { position: "back", docId: "room1_back" },
+  { position: "left", docId: "room1_left" },
+  { position: "right", docId: "room1_right" },
+];
 
-/**
- * Calculate average of numeric values
- */
-function calculateAverage(values) {
-  const valid = values.filter((v) => typeof v === "number" && !isNaN(v));
+const ROOM1_LOG_COLLECTIONS = [
+  { position: "front", collection: "room1_front_logs", sheet: "Room1 Front Logs" },
+  { position: "back", collection: "room1_back_logs", sheet: "Room1 Back Logs" },
+  { position: "left", collection: "room1_left_logs", sheet: "Room1 Left Logs" },
+  { position: "right", collection: "room1_right_logs", sheet: "Room1 Right Logs" },
+];
 
-  if (valid.length === 0) return null;
+const TOTAL_ROOM1_NODES = ROOM1_SENSOR_DOCS.length;
+const ROOM_REFRESH_INTERVAL_MS = 60000;
+const roomResponseCache = {};
 
-  const sum = valid.reduce((acc, val) => acc + val, 0);
-  return sum / valid.length;
-}
-
-/**
- * Extract thermal frame and compute min/max
- */
-function processThermalData(docData) {
-  if (!docData || !docData.frame || !Array.isArray(docData.frame)) {
-    return null;
-  }
-
-  const frame = docData.frame;
-  const width = docData.width;
-  const height = docData.height;
-
-  // If values were multiplied by 100 in ESP
-  const processedFrame = frame
-    .filter((v) => typeof v === "number" && !isNaN(v))
-    .map((v) => v / 100);
-
-  const min = Math.min(...processedFrame);
-  const max = Math.max(...processedFrame);
-
-  return {
-    frame: processedFrame,
-    width,
-    height,
-    min,
-    max,
-  };
-}
+// ------------------------------------------------------------
+// Utility Functions
+// ------------------------------------------------------------
 
 /**
  * Normalize Firestore timestamp to ISO string
@@ -116,97 +98,164 @@ function formatFirestoreTimestamp(timestampValue) {
 }
 
 /**
- * Get averaged sensor data for a room (Combined DSS)
+ * Build monitoring status message
+ */
+function buildMonitoringStatusMessage(availableNodes, totalNodes) {
+  if (availableNodes >= totalNodes) {
+    return `Based on ${totalNodes} sensor positions`;
+  }
+
+  return `Degraded Monitoring: Running on ${availableNodes} of ${totalNodes} nodes`;
+}
+
+/**
+ * Extract thermal frame and compute min/max
+ */
+function processThermalData(docData) {
+  if (!docData || !docData.frame || !Array.isArray(docData.frame)) {
+    return null;
+  }
+
+  const frame = docData.frame;
+  const width = docData.width;
+  const height = docData.height;
+
+  const processedFrame = frame
+    .filter((v) => typeof v === "number" && !isNaN(v))
+    .map((v) => v / 100);
+
+  if (processedFrame.length === 0) {
+    return null;
+  }
+
+  const min = Math.min(...processedFrame);
+  const max = Math.max(...processedFrame);
+
+  return {
+    frame: processedFrame,
+    width,
+    height,
+    min,
+    max,
+  };
+}
+
+/**
+ * Get averaged sensor data for Room 1 using front/back/left/right
  */
 async function getRoomSensorData(roomName) {
   try {
-    const frontRef = db.collection("sensorData").doc(`${roomName}_front`);
-    const backRef = db.collection("sensorData").doc(`${roomName}_back`);
-
-    const [frontSnap, backSnap] = await Promise.all([
-      frontRef.get(),
-      backRef.get(),
-    ]);
-
-    const temperatureValues = [];
-    const humidityValues = [];
-
-    // ---------- FRONT ----------
-    if (frontSnap.exists) {
-      const frontData = frontSnap.data();
-
-      if (
-        typeof frontData.Temperature === "number" &&
-        !isNaN(frontData.Temperature)
-      ) {
-        temperatureValues.push(frontData.Temperature);
-      }
-
-      if (
-        typeof frontData.Humidity === "number" &&
-        !isNaN(frontData.Humidity)
-      ) {
-        humidityValues.push(frontData.Humidity);
-      }
-    }
-
-    // ---------- BACK ----------
-    if (backSnap.exists) {
-      const backData = backSnap.data();
-
-      if (
-        typeof backData.Temperature === "number" &&
-        !isNaN(backData.Temperature)
-      ) {
-        temperatureValues.push(backData.Temperature);
-      }
-
-      if (
-        typeof backData.Humidity === "number" &&
-        !isNaN(backData.Humidity)
-      ) {
-        humidityValues.push(backData.Humidity);
-      }
-    }
-
-    // If both prototypes missing
-    if (temperatureValues.length === 0 || humidityValues.length === 0) {
-      console.warn(`⚠ No valid sensor values for ${roomName}`);
+    if (roomName !== "room1") {
       return null;
     }
 
-    // ---------- AVERAGE ----------
-    const avgTemperature =
-      temperatureValues.reduce((a, b) => a + b, 0) / temperatureValues.length;
+    // Wrap Firestore queries with a timeout (4 seconds) to prevent hanging
+    const queryTimeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error("Firestore query timeout")), 4000)
+    );
 
-    let avgHumidity =
-      humidityValues.reduce((a, b) => a + b, 0) / humidityValues.length;
+    const queryProm = (async () => {
+      const snapshots = await Promise.all(
+        ROOM1_SENSOR_DOCS.map((node) =>
+          db.collection("sensorData").doc(node.docId).get()
+        )
+      );
+      return snapshots;
+    })();
 
-    // Clamp humidity to valid physical range
-    avgHumidity = Math.min(Math.max(avgHumidity, 0), 100);
+    const snapshots = await Promise.race([queryProm, queryTimeoutPromise]);
 
-    // ---------- HEAT INDEX ----------
-    let computedHeatIndex = null;
-    let label = null;
-    let advisory = null;
+    const validNodeReadings = [];
+    const nodeStatus = {};
 
-    if (avgTemperature !== null && avgHumidity !== null) {
-      computedHeatIndex = computeHeatIndex(avgTemperature, avgHumidity);
-      label = getHeatIndexLabel(computedHeatIndex);
-      advisory = getHeatIndexAdvisory(computedHeatIndex);
+    ROOM1_SENSOR_DOCS.forEach((node, index) => {
+      const snap = snapshots[index];
 
-      if (typeof advisory === "string") advisory = [advisory];
+      if (!snap.exists) {
+        nodeStatus[node.position] = {
+          available: false,
+          temperature: null,
+          humidity: null,
+        };
+        return;
+      }
+
+      const data = snap.data();
+
+      const hasValidTemperature =
+        typeof data.Temperature === "number" && !isNaN(data.Temperature);
+
+      const hasValidHumidity =
+        typeof data.Humidity === "number" && !isNaN(data.Humidity);
+
+      if (hasValidTemperature && hasValidHumidity) {
+        const safeHumidity = Math.min(Math.max(data.Humidity, 0), 100);
+
+        validNodeReadings.push({
+          position: node.position,
+          temperature: data.Temperature,
+          humidity: safeHumidity,
+        });
+
+        nodeStatus[node.position] = {
+          available: true,
+          temperature: Number(data.Temperature.toFixed(1)),
+          humidity: Number(safeHumidity.toFixed(1)),
+        };
+      } else {
+        nodeStatus[node.position] = {
+          available: false,
+          temperature: hasValidTemperature ? Number(data.Temperature.toFixed(1)) : null,
+          humidity: hasValidHumidity ? Number(Math.min(Math.max(data.Humidity, 0), 100).toFixed(1)) : null,
+        };
+      }
+    });
+
+    const availableNodes = validNodeReadings.length;
+
+    if (availableNodes === 0) {
+      console.warn(`No valid sensor values for ${roomName}`);
+      return null;
     }
 
+    const avgTemperature =
+      validNodeReadings.reduce((sum, item) => sum + item.temperature, 0) /
+      availableNodes;
+
+    const avgHumidity =
+      validNodeReadings.reduce((sum, item) => sum + item.humidity, 0) /
+      availableNodes;
+
+    const roundedTemperature = Number(avgTemperature.toFixed(1));
+    const roundedHumidity = Number(avgHumidity.toFixed(1));
+
+    const computedHeatIndex = computeHeatIndex(
+      roundedTemperature,
+      roundedHumidity
+    );
+    const label = getHeatIndexLabel(computedHeatIndex);
+    const advisory = getHeatIndexAdvisory(computedHeatIndex);
+
     return {
-      averageTemperature: Number(avgTemperature.toFixed(1)),
-      averageHumidity: Number(avgHumidity.toFixed(1)),
+      averageTemperature: roundedTemperature,
+      averageHumidity: roundedHumidity,
       heatIndex: computedHeatIndex,
       label,
-      advisory,
+      advisory: Array.isArray(advisory)
+        ? advisory
+        : advisory
+          ? [advisory]
+          : ["No advisory available"],
+      monitoringStatus: buildMonitoringStatusMessage(
+        availableNodes,
+        TOTAL_ROOM1_NODES
+      ),
+      availableNodes,
+      totalNodes: TOTAL_ROOM1_NODES,
+      nodeStatus,
     };
   } catch (error) {
-    console.error("❌ Error fetching sensor data:", error);
+    console.error("Error fetching sensor data:", error);
     return null;
   }
 }
@@ -216,23 +265,29 @@ async function getRoomSensorData(roomName) {
  */
 async function getRoomThermalData(roomName) {
   try {
+    if (roomName !== "room1") {
+      return null;
+    }
+
     const thermalRef = db.collection("thermalRooms").doc(roomName);
     const snapshot = await thermalRef.get();
 
     if (!snapshot.exists) {
-      console.warn(`⚠ No thermal data found for ${roomName}`);
+      console.warn(`No thermal data found for ${roomName}`);
       return null;
     }
 
     const thermalData = snapshot.data();
     return processThermalData(thermalData);
   } catch (error) {
-    console.error("❌ Error fetching thermal data:", error);
+    console.error("Error fetching thermal data:", error);
     return null;
   }
 }
 
-// * Build unified room response
+/**
+ * Build unified room response
+ */
 async function buildRoomResponse(roomName) {
   const sensorData = await getRoomSensorData(roomName);
   const thermalData = await getRoomThermalData(roomName);
@@ -244,33 +299,58 @@ async function buildRoomResponse(roomName) {
   return {
     ...sensorData,
     thermal: thermalData,
-    timestamp: Date.now(), // Backend timestamp
+    timestamp: Date.now(),
   };
+}
+
+/**
+ * Refresh backend cache from Firestore every 5 seconds
+ */
+async function refreshRoomCache(roomName) {
+  try {
+    const roomData = await buildRoomResponse(roomName);
+    if (roomData) {
+      roomResponseCache[roomName] = roomData;
+    }
+  } catch (error) {
+    console.error(`Error refreshing cache for ${roomName}:`, error);
+  }
+}
+
+function startRoomCachePolling(roomName) {
+  refreshRoomCache(roomName);
+  setInterval(() => refreshRoomCache(roomName), ROOM_REFRESH_INTERVAL_MS);
 }
 
 /**
  * Get historical logs for one Firestore collection
  */
-async function getHistoricalLogs(collectionName) {
+async function getHistoricalLogs(collectionName, nodeName) {
   try {
     const snapshot = await db
       .collection(collectionName)
       .orderBy("timestamp", "asc")
       .get();
 
-    return snapshot.docs.map((doc) => {
+    return snapshot.docs.map((doc, index) => {
       const data = doc.data();
 
       return {
-        docId: doc.id,
-        temperature:
-          typeof data.Temperature === "number" ? data.Temperature : "",
-        humidity: typeof data.Humidity === "number" ? data.Humidity : "",
+        logNumber: index + 1,
+        nodeName,
         timestamp: formatFirestoreTimestamp(data.timestamp),
+        temperature:
+          typeof data.Temperature === "number"
+            ? Number(data.Temperature.toFixed(1))
+            : "",
+        humidity:
+          typeof data.Humidity === "number"
+            ? Number(data.Humidity.toFixed(1))
+            : "",
       };
     });
   } catch (error) {
-    console.error(`❌ Error fetching historical logs for ${collectionName}:`, error);
+    console.error(`Error fetching historical logs for ${collectionName}:`, error);
     throw error;
   }
 }
@@ -282,7 +362,8 @@ function addHistoricalWorksheet(workbook, sheetName, rows) {
   const worksheet = workbook.addWorksheet(sheetName);
 
   worksheet.columns = [
-    { header: "Document ID", key: "docId", width: 28 },
+    { header: "Log Number", key: "logNumber", width: 14 },
+    { header: "Node Name", key: "nodeName", width: 18 },
     { header: "Timestamp", key: "timestamp", width: 28 },
     { header: "Temperature (°C)", key: "temperature", width: 18 },
     { header: "Humidity (%)", key: "humidity", width: 15 },
@@ -293,7 +374,8 @@ function addHistoricalWorksheet(workbook, sheetName, rows) {
 
   if (rows.length === 0) {
     worksheet.addRow({
-      docId: "",
+      logNumber: "",
+      nodeName: "",
       timestamp: "No data available",
       temperature: "",
       humidity: "",
@@ -305,15 +387,32 @@ function addHistoricalWorksheet(workbook, sheetName, rows) {
 }
 
 // ------------------------------------------------------------
-// 🔹 API Routes
+// API Routes
 // ------------------------------------------------------------
 
-// * GET Room Data
+/**
+ * GET Room Data
+ */
 app.get("/api/:roomName", async (req, res) => {
   const roomName = req.params.roomName;
 
+  // Set cache control headers - cache for 30 seconds
+  res.set("Cache-Control", "public, max-age=30");
+  res.set("Content-Type", "application/json; charset=utf-8");
+
   try {
-    const roomData = await buildRoomResponse(roomName);
+    // Limit Firestore query to 5 seconds max
+    const queryTimeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error("Query timeout")), 5000)
+    );
+
+    const dataProm = (async () => {
+      const roomData =
+        roomResponseCache[roomName] || (await buildRoomResponse(roomName));
+      return roomData;
+    })();
+
+    const roomData = await Promise.race([dataProm, queryTimeoutPromise]);
 
     if (!roomData) {
       return res.status(404).json({
@@ -325,14 +424,18 @@ app.get("/api/:roomName", async (req, res) => {
       [roomName]: roomData,
     });
   } catch (error) {
-    console.error("❌ API error:", error);
-    return res.status(500).json({
+    console.error("API error:", error);
+    // Return 503 Service Unavailable for timeouts
+    const statusCode = error.message === "Query timeout" ? 503 : 500;
+    return res.status(statusCode).json({
       error: "Internal Server Error",
     });
   }
 });
 
-// * POST AI Heat Index Explanation
+/**
+ * POST AI Heat Index Explanation
+ */
 app.post("/api/ai/heat-index", async (req, res) => {
   try {
     const {
@@ -351,6 +454,7 @@ app.post("/api/ai/heat-index", async (req, res) => {
     }
 
     const aiResponse = await getHeatIndexAIResponse({
+      room: "room1",
       temperature,
       humidity,
       heatIndex,
@@ -363,14 +467,16 @@ app.post("/api/ai/heat-index", async (req, res) => {
       explanation: aiResponse,
     });
   } catch (error) {
-    console.error("❌ AI Route error:", error);
+    console.error("AI Route error:", error);
     return res.status(500).json({
       error: "AI processing failed.",
     });
   }
 });
 
-// * GET Export Historical Logs to Excel
+/**
+ * GET Export Historical Logs to Excel
+ */
 app.get("/api/export/historical-logs/excel", async (req, res) => {
   try {
     const workbook = new ExcelJS.Workbook();
@@ -379,15 +485,11 @@ app.get("/api/export/historical-logs/excel", async (req, res) => {
     workbook.created = new Date();
     workbook.modified = new Date();
 
-    const collections = [
-      { collection: "room1_front_logs", sheet: "Room1 Front Logs" },
-      { collection: "room1_back_logs", sheet: "Room1 Back Logs" },
-      { collection: "room2_front_logs", sheet: "Room2 Front Logs" },
-      { collection: "room2_back_logs", sheet: "Room2 Back Logs" },
-    ];
-
-    for (const item of collections) {
-      const rows = await getHistoricalLogs(item.collection);
+    for (const item of ROOM1_LOG_COLLECTIONS) {
+      const rows = await getHistoricalLogs(
+        item.collection,
+        `room1_${item.position}`
+      );
       addHistoricalWorksheet(workbook, item.sheet, rows);
     }
 
@@ -404,7 +506,7 @@ app.get("/api/export/historical-logs/excel", async (req, res) => {
 
     return res.send(Buffer.from(buffer));
   } catch (error) {
-    console.error("❌ Export route error:", error);
+    console.error("Export route error:", error);
     return res.status(500).json({
       error: "Failed to export historical data logs.",
     });
@@ -412,10 +514,15 @@ app.get("/api/export/historical-logs/excel", async (req, res) => {
 });
 
 // ------------------------------------------------------------
-// 🔹 Start Server
+// Start backend room cache polling
+// ------------------------------------------------------------
+startRoomCachePolling("room1");
+
+// ------------------------------------------------------------
+// Start Server
 // ------------------------------------------------------------
 const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {
-  console.log(`🚀 Server running on http://localhost:${PORT}`);
+  console.log(`Server running on http://localhost:${PORT}`);
 });

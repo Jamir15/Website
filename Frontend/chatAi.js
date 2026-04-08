@@ -19,8 +19,10 @@ export function updateAIContext(context) {
 function addChatMessage(sender, text) {
   const container = document.getElementById("chat-messages");
   const msg = document.createElement("div");
+
   msg.className = sender === "user" ? "chat-msg user" : "chat-msg ai";
   msg.textContent = text;
+
   container.appendChild(msg);
   container.scrollTop = container.scrollHeight;
 }
@@ -33,6 +35,16 @@ async function sendAIMessage(question) {
 
   if (!latest) {
     addChatMessage("ai", "No sensor data available yet.");
+    return;
+  }
+
+  if (latest.room === "room2") {
+    addChatMessage(
+      "ai",
+      `Room 2 is currently reserved for future expansion.
+
+The architecture supports multi-room deployment through the same backend, Firestore, and dashboard structure.`,
+    );
     return;
   }
 
@@ -60,24 +72,22 @@ async function sendAIMessage(question) {
     }
 
     const data = await response.json();
-
     addChatMessage("ai", data.explanation);
   } catch (error) {
     console.log("Backend unreachable", error);
 
     addChatMessage(
       "ai",
-      `
+      `Room: ${latest.room || "room1"}
 Temperature: ${latest.temperature} °C
 Humidity: ${latest.humidity} %
 Heat Index: ${latest.heatIndex} °C
 
 Heat Index Advisory (Decision Support System): ${latest.label}
 
-${latest.advisory?.map((a) => `- ${a}`).join("\n")}
+${latest.advisory?.map((a) => `- ${a}`).join("\n") || "- No advisory available"}
 
-System Status: Backend unavailable (Fallback Mode)
-`,
+System Status: Backend unavailable (Fallback Mode)`,
     );
   }
 }

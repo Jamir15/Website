@@ -8,7 +8,7 @@ import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { initializeApp } from "firebase/app";
-import { getFirestore, doc, onSnapshot } from "firebase/firestore";
+import { getFirestore, doc, getDoc, onSnapshot } from "firebase/firestore";
 import { Chart, registerables } from "chart.js/auto";
 import { initAIChat, updateAIContext } from "./chatAi.js";
 
@@ -88,7 +88,7 @@ const db = getFirestore(app);
  * ===================================================================== */
 
 const thermalDataByRoom = {};
-const THERMAL_TIMEOUT_MS = 30000;
+const THERMAL_TIMEOUT_MS = 65000;
 let thermalRecoveredOnce = {};
 
 function initThermalRecoveryState(roomId) {
@@ -120,19 +120,7 @@ async function initializeThermalRoom(roomId) {
       const timeoutPromise = new Promise((_, reject) =>
         setTimeout(() => reject(new Error("Thermal fetch timeout")), 5000)
       );
-      const docPromise = (async () => {
-        const s = await new Promise((resolve, reject) => {
-          const unsubscribe = onSnapshot(
-            ref,
-            (snapshot) => {
-              unsubscribe();
-              resolve(snapshot);
-            },
-            reject
-          );
-        });
-        return s;
-      })();
+      const docPromise = getDoc(ref);
       return Promise.race([docPromise, timeoutPromise]);
     })();
 
@@ -527,8 +515,8 @@ function initThreeJS() {
       if (now - slice.userData.lastUpdateTime < delay) return;
 
       const decayFactor = Math.exp(-HEAT_DECAY_PER_SLICE * index);
-      slice.material.opacity = HEAT_MAX_OPACITY * decayFactor;
-      slice.material.emissiveIntensity = 0.6 * (decayFactor * decayFactor);
+      slice.userData.targetOpacity = HEAT_MAX_OPACITY * decayFactor;
+      slice.userData.targetEmissive = 0.6 * (decayFactor * decayFactor);
 
       if (!slice.material.map) {
         slice.material.map = heatmapTexture;
@@ -561,6 +549,9 @@ function initThreeJS() {
   const HEAT_DECAY_PER_SLICE = 0.12;
   const HEAT_TIME_LAG_MS = 120;
   const HEAT_MAX_OPACITY = 0.85;
+  const HEAT_BASE_OPACITY = 0.06;
+  const HEAT_BASE_EMISSIVE = 0.02;
+  const HEAT_TRANSITION_LERP = 0.12;
 
   // Clear and reuse global heatSlices array
   heatSlices.length = 0;
@@ -569,11 +560,11 @@ function initThreeJS() {
     const material = new THREE.MeshStandardMaterial({
       map: heatmapTexture,
       transparent: true,
-      opacity: 0.0,
+      opacity: HEAT_BASE_OPACITY,
       side: THREE.DoubleSide,
       emissive: 0xffffff,
       emissiveMap: heatmapTexture,
-      emissiveIntensity: 0.0,
+      emissiveIntensity: HEAT_BASE_EMISSIVE,
     });
 
     const slice = new THREE.Mesh(heatmapGeometry, material);
@@ -588,10 +579,31 @@ function initThreeJS() {
     slice.userData = {
       lastUpdateTime: 0,
       intensity: 0,
+      targetOpacity: HEAT_BASE_OPACITY,
+      targetEmissive: HEAT_BASE_EMISSIVE,
     };
 
     heatSlices.push(slice);
     scene.add(slice);
+  }
+
+  function animateHeatSlices() {
+    heatSlices.forEach((slice) => {
+      const targetOpacity =
+        typeof slice.userData.targetOpacity === "number"
+          ? slice.userData.targetOpacity
+          : HEAT_BASE_OPACITY;
+      const targetEmissive =
+        typeof slice.userData.targetEmissive === "number"
+          ? slice.userData.targetEmissive
+          : HEAT_BASE_EMISSIVE;
+
+      slice.material.opacity +=
+        (targetOpacity - slice.material.opacity) * HEAT_TRANSITION_LERP;
+      slice.material.emissiveIntensity +=
+        (targetEmissive - slice.material.emissiveIntensity) *
+        HEAT_TRANSITION_LERP;
+    });
   }
 
   /**
@@ -868,15 +880,21 @@ function initThreeJS() {
     renderer.setSize(container.clientWidth, container.clientHeight);
   });
 
-  function animate() {
-    requestAnimationFrame(animate);
-    controls.update();
-    renderer.render(scene, camera);
-  }
+  let lastThermalLoopTime = 0;
+  const THERMAL_LOOP_INTERVAL_MS = 30000;
 
-  setInterval(() => {
+  function updateThermalVisuals(now) {
     const roomState = thermalDataByRoom[REAL_ROOM_ID];
-    const now = Date.now();
+    const hasImmediateDirtyFrame =
+      !!roomState && roomState.dirty && Array.isArray(roomState.frame);
+
+    if (
+      !hasImmediateDirtyFrame &&
+      now - lastThermalLoopTime < THERMAL_LOOP_INTERVAL_MS
+    ) {
+      return;
+    }
+    lastThermalLoopTime = now;
 
     if (activeRoom !== REAL_ROOM_ID) {
       heatSlices.forEach((slice) => {
@@ -888,22 +906,16 @@ function initThreeJS() {
     if (!roomState) {
       heatSlices.forEach((slice) => {
         slice.visible = isHeatmapEnabled;
+        slice.userData.targetOpacity = HEAT_BASE_OPACITY;
+        slice.userData.targetEmissive = HEAT_BASE_EMISSIVE;
       });
       return;
     }
 
-    if (
-      roomState.ready &&
-      now - roomState.lastUpdateTime > THERMAL_TIMEOUT_MS
-    ) {
+    if (roomState.ready && now - roomState.lastUpdateTime > THERMAL_TIMEOUT_MS) {
       if (!roomState.stale) {
         roomState.stale = true;
         console.warn(`Thermal watchdog: ${REAL_ROOM_ID} data stream stale`);
-
-        heatSlices.forEach((slice) => {
-          slice.material.opacity *= 0.3;
-          slice.material.emissiveIntensity = 0.01;
-        });
       }
     }
 
@@ -926,7 +938,16 @@ function initThreeJS() {
       roomState.dirty = true;
       roomState.restoreVisual = false;
     }
-  }, 30000);
+  }
+
+  function animate() {
+    requestAnimationFrame(animate);
+    const now = Date.now();
+    updateThermalVisuals(now);
+    animateHeatSlices();
+    controls.update();
+    renderer.render(scene, camera);
+  }
 
   animate();
 }

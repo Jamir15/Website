@@ -1,16 +1,17 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>3D Sensor Dashboard</title>
-    <link rel="stylesheet" href="index.css">
+    <link rel="stylesheet" href="index.css" />
 
     <!-- ES Module Shims for import maps -->
     <script async src="https://unpkg.com/es-module-shims@1.6.3/dist/es-module-shims.js"></script>
+
     <script type="importmap">
         {
-            "imports": {    
+            "imports": {
                 "three": "https://unpkg.com/three@0.163.0/build/three.module.js",
                 "three/addons/": "https://unpkg.com/three@0.163.0/examples/jsm/",
                 "chart.js/auto": "https://cdn.jsdelivr.net/npm/chart.js@4.4.2/+esm",
@@ -21,21 +22,16 @@
     </script>
 </head>
 <body>
-
-    <!-- ======= GRID LAYOUT START ======= -->
     <div class="layout-grid">
 
         <!-- LEFT SIDEBAR -->
         <aside class="sidebar-left">
             <h2 class="sidebar-title">Dashboard</h2>
 
-            <!-- ===========================
-                 NOTIFICATIONS CONTAINER
-            ============================ -->
+            <!-- NOTIFICATIONS -->
             <div id="notifications-container">
                 <div class="nav-section-title">Notifications</div>
 
-                <!-- Condition (persistent) -->
                 <div id="condition-banner" class="notification show condition-normal">
                     <p id="condition-title">✅ Normal</p>
                     <p id="condition-desc">Comfortable condition</p>
@@ -44,14 +40,12 @@
                 <div class="notification-divider" aria-hidden="true"></div>
                 <div class="nav-section-title notification-subtitle">Alerts</div>
 
-                <!-- Heat Index Alert -->
                 <div id="alert-banner" class="notification hidden">
                     <p id="alert-message"></p>
                 </div>
 
-                <!-- Peak Heat Hours Reminder -->
                 <div id="peak-heat-banner" class="notification hidden">
-                    <p id="peak-heat-message">&#x1F324;&#xFE0F; Peak Heat Hours Reminder</p>
+                    <p id="peak-heat-message">🌤️ Peak Heat Hours Reminder</p>
                 </div>
             </div>
 
@@ -59,7 +53,7 @@
             <div class="view-controls">
                 <label class="toggle-row">
                     <span class="toggle-label">Heat Map</span>
-                    <input type="checkbox" id="heatmap-toggle" checked>
+                    <input type="checkbox" id="heatmap-toggle" checked />
                     <span class="toggle-switch"></span>
                 </label>
             </div>
@@ -79,55 +73,53 @@
             </nav>
         </aside>
 
-
-        <!-- MAIN CONTENT AREA -->
+        <!-- MAIN CONTENT -->
         <main class="main-content">
+
+            <!-- DASHBOARD VIEW -->
             <div id="dashboard-view">
+                <div class="threejs-chart-wrapper">
+                    <div class="threejs-wrapper">
+                        <div id="canvas-container"></div>
+                        <div id="loading-overlay">Loading Model...</div>
+                    </div>
 
-            <!-- Middle Row: 3D Model + Chart -->
-            <div class="threejs-chart-wrapper">
-
-                <!-- 3D Model Viewer -->
-                <div class="threejs-wrapper">
-                    <div id="canvas-container"></div>
-                    <div id="loading-overlay">Loading Model...</div>
+                    <div class="chart-container">
+                        <canvas id="sensorChart"></canvas>
+                    </div>
                 </div>
 
-                <!-- Chart -->
-                <div class="chart-container">
-                    <!-- Keep the ID as 'sensorChart' to ensure JS compatibility -->
-                    <canvas id="sensorChart"></canvas>
+                <div class="data-cards">
+                    <div class="card">
+                        <h3><span class="card-emoji">🌡️</span> Temperature</h3>
+                        <div class="value"><span id="temp-val">--</span> °C</div>
+                    </div>
+
+                    <div class="card">
+                        <h3><span class="card-emoji">💧</span> Humidity</h3>
+                        <div class="value"><span id="hum-val">--</span> %</div>
+                    </div>
+
+                    <div class="card">
+                        <h3><span class="card-emoji">🔥</span> Heat Index</h3>
+                        <div class="value"><span id="hi-val">--</span> °C</div>
+                    </div>
                 </div>
 
-            </div>
+                <div class="card" id="dss-card">
+                    <div class="dss-header">
+                        <h3 id="dss-title">Heat Index Advisory (Decision Support System): --</h3>
+                    </div>
 
-            <!-- SENSOR CARDS -->
-            <div class="data-cards">
-                <div class="card">
-                    <h3><span class="card-emoji">&#x1F321;&#xFE0F;</span> Temperature</h3>
-                    <div class="value"><span id="temp-val">--</span> °C</div>
-                </div>
-                <div class="card">
-                    <h3><span class="card-emoji">&#x1F4A7;</span> Humidity</h3>
-                    <div class="value"><span id="hum-val">--</span> %</div>
-                </div>
-                <div class="card">
-                    <h3><span class="card-emoji">&#x1F525;</span> Heat Index</h3>
-                    <div class="value"><span id="hi-val">--</span> °C</div>
-                </div>
-            </div>
+                        <div id="dss-content">
+                        <p>Waiting data...</p>
+                    </div>
 
-            <!-- DECISION SUPPORT SYSTEM (DSS) CARD -->
-            <div class="card" id="dss-card">
-                <div class="dss-header">
-                    <h3 id="dss-title">Heat Index Advisory (Decision Support System): --</h3>
+                    <div id="dss-sources">
+                        <p id="dss-source-left">Based on CDRRMO Heat Index Threshold Guidelines</p>
+                        <p id="dss-source-right">Based on 4 sensor positions</p>
+                    </div>
                 </div>
-                <div id="dss-content">
-                    <p>Waiting data...</p>
-                </div>
-                <p id="dss-source">Based on CDRRMO Heat Index Threshold Guidelines</p>
-            </div>
-
             </div>
 
             <!-- SETTINGS VIEW -->
@@ -143,10 +135,11 @@
                             Dark Mode
                         </span>
                         <label class="mode-toggle-row">
-                            <input type="checkbox" id="darkmode-toggle">
+                            <input type="checkbox" id="darkmode-toggle" />
                             <span class="mode-toggle-switch" aria-hidden="true"></span>
                         </label>
                     </div>
+
                     <div class="settings-option-row">
                         <span class="settings-option-label">
                             <span class="settings-emoji" role="img" aria-label="Export historical data logs">📥</span>
@@ -154,7 +147,8 @@
                         </span>
                         <button
                             type="button"
-                            class="settings-action-button" id="export-logs-button"
+                            class="settings-action-button"
+                            id="export-logs-button"
                             onclick="exportHistoricalLogs()"
                         >
                             Download
@@ -162,7 +156,6 @@
                     </div>
                 </div>
 
-                <!-- FOOTER -->
                 <footer class="dashboard-footer">
                     <div class="footer-content">
                         <p class="footer-copyright">@2026 created by</p>
@@ -173,259 +166,266 @@
 
             <!-- ABOUT VIEW -->
             <section id="about-view" class="settings-view view-hidden">
-                <h2 class="settings-header">About the System</h2>
-                
-                <div class="about-content">
-                    <!-- System Overview -->
-                    <div class="about-section">
-                        <h3>🌡️ System Overview</h3>
-                        <p>The <strong>Classroom Evaluation Parametric Instrument and Digital Twin System</strong> is an integrated environmental monitoring platform designed to track, analyze, and visualize thermal conditions in real-time. The system combines IoT sensor networks, 3D digital twin visualization, and AI-powered decision support to ensure optimal indoor environmental quality.</p>
-                    </div>
+                <header class="settings-view-header">
+                    <h2 class="settings-header">About the System</h2>
+                </header>
 
-                    <!-- Peak Heat Hours -->
-                    <div class="about-section">
-                        <h3>⏰ Peak Heat Hours</h3>
-                        <p>The system monitors and alerts users during <strong>Peak Heat Hours</strong>, typically occurring between <strong>11:00 AM and 4:00 PM</strong> (11:00 - 16:00). During these hours, solar radiation is at its maximum, increasing the risk of heat-related stress even in indoor environments.</p>
-                        <div class="about-highlight">
-                            <strong>Alert Trigger:</strong> Automatic notification banner displays when current time falls within peak heat hours.
+                <div class="settings-view-body">
+                    <div class="about-content">
+
+                        <!-- System Overview -->
+                        <div class="about-section">
+                            <h3>🌡️ System Overview</h3>
+                            <p>
+                                The <strong>Classroom Evaluation Parametric Instrument and Digital Twin System</strong>
+                                is an integrated environmental monitoring platform designed to track, analyze, and
+                                visualize classroom thermal conditions in real time. The system combines multiple
+                                sensor positions, a 3D digital twin visualization, and a decision support dashboard
+                                for classroom environmental monitoring.
+                            </p>
                         </div>
-                    </div>
 
-                    <!-- Heat Index Formula -->
-                    <div class="about-section">
-                        <h3>🧮 Heat Index Calculation</h3>
-                        <p>The system uses the <strong>National Weather Service (NWS) Rothfusz Regression Formula</strong> for calculating the Heat Index, with fallback to the Steadman approximation for lower temperatures.</p>
-                        
-                        <div class="formula-box">
-                            <h4>Rothfusz Regression Formula:</h4>
-                            <code>
-HI = -42.379 + 2.04901523×T + 10.14333127×R 
-     - 0.22475541×T×R - 0.00683783×T² - 0.05481717×R² 
+                        <!-- Room 1 Monitoring Layout -->
+                        <div class="about-section">
+                            <h3>📍 Room 1 Monitoring Layout</h3>
+                            <p>
+                                Room 1 uses <strong>four sensor positions</strong> for environmental monitoring:
+                                <strong>front</strong>, <strong>back</strong>, <strong>left</strong>, and
+                                <strong>right</strong>. Temperature and humidity from the available nodes are
+                                combined to produce the averaged Room 1 environmental condition shown on the dashboard.
+                            </p>
+                            <p>
+                                Thermal visualization remains connected to the <strong>front node</strong>, where the
+                                MLX90640 thermal imaging module is installed.
+                            </p>
+                        </div>
+
+                        <!-- Peak Heat Hours -->
+                        <div class="about-section">
+                            <h3>⏰ Peak Heat Hours</h3>
+                            <p>
+                                The system monitors and alerts users during <strong>Peak Heat Hours</strong>, typically
+                                occurring between <strong>11:00 AM and 4:00 PM</strong>. During these hours, the risk
+                                of heat-related discomfort becomes more significant.
+                            </p>
+                            <div class="about-highlight">
+                                <strong>Alert Trigger:</strong> An automatic notification banner appears when the
+                                current time falls within peak heat hours.
+                            </div>
+                        </div>
+
+                        <!-- Heat Index Calculation -->
+                        <div class="about-section">
+                            <h3>🧮 Heat Index Calculation</h3>
+                            <p>
+                                The system uses the <strong>Rothfusz Regression Formula</strong> for Heat Index
+                                computation, with fallback to the <strong>Steadman approximation</strong> when the
+                                conditions are outside the intended Rothfusz operating range.
+                            </p>
+
+                            <div class="formula-box">
+                                <h4>Rothfusz Regression Formula:</h4>
+                                <code>
+HI = -42.379 + 2.04901523×T + 10.14333127×R
+     - 0.22475541×T×R - 0.00683783×T² - 0.05481717×R²
      + 0.00122874×T²×R + 0.00085282×T×R² - 0.00000199×T²×R²
-                            </code>
-                            <p class="formula-note">Where: <strong>T</strong> = Temperature (°F), <strong>R</strong> = Relative Humidity (%), <strong>HI</strong> = Heat Index (°F)</p>
+                                </code>
+                                <p class="formula-note">
+                                    Where: <strong>T</strong> = Temperature (°F),
+                                    <strong>R</strong> = Relative Humidity (%),
+                                    <strong>HI</strong> = Heat Index (°F)
+                                </p>
+                            </div>
+
+                            <div class="formula-conditions">
+                                <h4>Calculation Conditions:</h4>
+                                <ul>
+                                    <li><strong>Below 20°C:</strong> Heat Index equals air temperature</li>
+                                    <li><strong>20°C to 26.7°C:</strong> Steadman simple approximation</li>
+                                    <li><strong>Above 26.7°C:</strong> Full Rothfusz regression with humidity adjustments</li>
+                                </ul>
+                            </div>
                         </div>
 
-                        <div class="formula-conditions">
-                            <h4>Calculation Conditions:</h4>
-                            <ul>
-                                <li><strong>Below 20°C:</strong> Heat Index equals air temperature</li>
-                                <li><strong>20°C - 26.7°C:</strong> Steadman simple approximation</li>
-                                <li><strong>Above 26.7°C:</strong> Full Rothfusz regression with humidity adjustments</li>
+                        <!-- Heat Index Categories -->
+                        <div class="about-section">
+                            <h3>⚠️ Heat Index Categories & Advisories</h3>
+
+                            <div class="category-grid">
+                                <div class="category-card normal">
+                                    <span class="category-label">Normal</span>
+                                    <span class="category-range">&lt; 27°C</span>
+                                    <p>Comfortable conditions. No heat-related risk.</p>
+                                </div>
+
+                                <div class="category-card caution">
+                                    <span class="category-label">Caution</span>
+                                    <span class="category-range">27°C – 32°C</span>
+                                    <p>Possible fatigue with prolonged exposure. Low risk, but still uncomfortable.</p>
+                                </div>
+
+                                <div class="category-card extreme-caution">
+                                    <span class="category-label">Extreme Caution</span>
+                                    <span class="category-range">33°C – 41°C</span>
+                                    <p>Higher chance of heat cramps and possible heat exhaustion. Extra hydration and breaks needed.</p>
+                                </div>
+
+                                <div class="category-card danger">
+                                    <span class="category-label">Danger</span>
+                                    <span class="category-range">42°C – 51°C</span>
+                                    <p>Likely heat cramps and heat exhaustion. Heat stroke becomes possible with prolonged exposure.</p>
+                                </div>
+
+                                <div class="category-card extreme-danger">
+                                    <span class="category-label">Extreme Danger</span>
+                                    <span class="category-range">52°C and above</span>
+                                    <p>Heat stroke highly likely. Immediate protective measures required.</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- CDRRMO Threshold Data -->
+                        <div class="about-section" id="cdrrmo-threshold-data">
+                            <h3>Cabuyao CDRRMO Heat Index Threshold Data</h3>
+                            <p>
+                                Reference thresholds from the Cabuyao City Disaster Risk Reduction and Management Office (CDRRMO)
+                                report titled <strong>"Threshold Data on Heat Indices"</strong>, including PAGASA heat index thresholds
+                                and related environmental factors used for advisories and operational decisions.
+                            </p>
+
+                            <div class="threshold-table-wrapper" role="region" aria-label="Heat index thresholds (PAGASA) table">
+                                <table class="threshold-table">
+                                    <thead>
+                                        <tr>
+                                            <th scope="col">Heat Index (&deg;C)</th>
+                                            <th scope="col">Category</th>
+                                            <th scope="col">Advisory Notes</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td>27&deg;C &ndash; 32&deg;C</td>
+                                            <td><strong>Caution</strong></td>
+                                            <td>Possible fatigue with prolonged exposure. Low risk, but still uncomfortable.</td>
+                                        </tr>
+                                        <tr>
+                                            <td>33&deg;C &ndash; 41&deg;C</td>
+                                            <td><strong>Extreme Caution</strong></td>
+                                            <td>
+                                                Higher chance of heat cramps. Possible heat exhaustion. Extra hydration and breaks needed.
+                                                Vulnerable groups are more at risk.
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td>42&deg;C &ndash; 51&deg;C</td>
+                                            <td><strong>Danger</strong></td>
+                                            <td>
+                                                Likely heat cramps and heat exhaustion. Heat stroke becomes possible with prolonged exposure.
+                                                Outdoor activities become risky. This is often the reference point the City of Cabuyao uses
+                                                when considering suspending classes.
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td>52&deg;C and above</td>
+                                            <td><strong>Extreme Danger</strong></td>
+                                            <td>
+                                                Heat stroke highly likely. Very unsafe for prolonged exposure.
+                                                Immediate protective measures required.
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <div class="threshold-grid">
+                                <div class="threshold-item">
+                                    <h4>1. Air Temperature Thresholds</h4>
+                                    <p><strong>High temperature</strong> (e.g., <strong>33&deg;C and above</strong>) increases heat stress on the body.</p>
+                                    <p class="threshold-note">Used to identify when heat index is likely to reach dangerous levels.</p>
+                                </div>
+
+                                <div class="threshold-item">
+                                    <h4>2. Relative Humidity Thresholds</h4>
+                                    <p><strong>High humidity</strong> (with <strong>60% and above</strong>) reduces the body's ability to cool through sweating.</p>
+                                    <p class="threshold-note">Humidity combined with temperature is what forms the heat index.</p>
+                                </div>
+
+                                <div class="threshold-item">
+                                    <h4>4. Wind Speed Thresholds</h4>
+                                    <p><strong>Low wind speed</strong> increases heat stress because it reduces natural cooling.</p>
+                                    <p class="threshold-note">Calm conditions (<strong>below 5 km/h</strong>) can aggravate high heat index levels.</p>
+                                </div>
+
+                                <div class="threshold-item">
+                                    <h4>5. Solar Radiation / Sun Exposure</h4>
+                                    <p><strong>High sunlight exposure</strong> further increases perceived heat.</p>
+                                    <p class="threshold-note">Outdoor activities become more dangerous even at lower heat index values.</p>
+                                </div>
+
+                                <div class="threshold-item">
+                                    <h4>6. Time-of-Day Threshold</h4>
+                                    <p>Heat index is highest between <strong>11:00 AM to 4:00 PM</strong>.</p>
+                                    <p class="threshold-note">Important for class scheduling, PE activities, and outdoor school events.</p>
+                                </div>
+
+                                <div class="threshold-item">
+                                    <h4>7. Indoor Temperature and Ventilation Thresholds</h4>
+                                    <p>Classrooms above <strong>35&deg;C</strong> and with poor ventilation increase health risks for students and staff.</p>
+                                    <p class="threshold-note">Used by school heads to decide on suspending in-person classes.</p>
+                                </div>
+                            </div>
+
+                            <p class="threshold-prepared">
+                                <strong>Prepared by:</strong> Vincent Paul L. Buot, RN, MDRM &mdash; Local DRRM Officer IV
+                            </p>
+                        </div>
+
+                        <!-- Scalability -->
+                        <div class="about-section">
+                            <h3>🧩 Scalability</h3>
+                            <p>
+                                The interface preserves a <strong>Room 2</strong> navigation entry to reflect the
+                                system’s scalable architecture. While Room 2 is currently reserved for future expansion,
+                                the backend, Firestore structure, dashboard routing, and overall system design are
+                                prepared for multi-room deployment.
+                            </p>
+                        </div>
+
+                        <!-- Hardware Components -->
+                        <div class="about-section">
+                            <h3>🔧 Hardware Components</h3>
+                            <ul class="component-list">
+                                <li><strong>ESP32-based Nodes</strong> – Distributed environmental sensing and wireless transmission</li>
+                                <li><strong>AHT20 Sensor</strong> – Temperature and humidity measurement</li>
+                                <li><strong>MLX90640</strong> – 32×24 thermal imaging array for front thermal visualization</li>
                             </ul>
                         </div>
-                    </div>
 
-                    <!-- Heat Index Categories -->
-                    <div class="about-section">
-                        <h3>⚠️ Heat Index Categories & Advisories</h3>
-                        <div class="category-grid">
-                            <div class="category-card normal">
-                                <span class="category-label">Normal</span>
-                                <span class="category-range">&lt; 27°C</span>
-                                <p>Comfortable conditions. No heat-related risk.</p>
-                            </div>
-                            <div class="category-card caution">
-                                <span class="category-label">Caution</span>
-                                <span class="category-range">27°C - 32°C</span>
-                                <p>Possible: fatigue with prolonged exposure. Low risk, but still uncomfortable.</p>
-                            </div>
-                            <div class="category-card extreme-caution">
-                                <span class="category-label">Extreme Caution</span>
-                                <span class="category-range">33°C - 41°C</span>
-                                <p>Higher chance of heat cramps. Possible heat exhaustion. Extra hydration and breaks needed. Vulnerable groups (children, elderly) are more at risk.</p>
-                            </div>
-                            <div class="category-card danger">
-                                <span class="category-label">Danger</span>
-                                <span class="category-range">42°C - 51°C</span>
-                                <p>Likely: heat cramps and heat exhaustion. Heat stroke becomes possible with prolonged exposure. Outdoor activities become risky. This is often the reference point the City of Cabuyao use when considering suspending classes.</p>
-                            </div>
-                            <div class="category-card extreme-danger">
-                                <span class="category-label">Extreme Danger</span>
-                                <span class="category-range">52°C and above</span>
-                                <p>Heat stroke highly likely. Very unsafe for outdoor activities and prolonged exposure. Immediate protective measures required.</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Cabuyao CDRRMO Threshold Data on Heat Indices (PDF Reference) -->
-                    <div class="about-section" id="cdrrmo-threshold-data">
-                        <h3>Cabuyao CDRRMO Heat Index Threshold Data</h3>
-                        <p>
-                            Reference thresholds from the Cabuyao City Disaster Risk Reduction and Management Office (CDRRMO)
-                            report titled <strong>&quot;Threshold Data on Heat Indices&quot;</strong>, including PAGASA heat index thresholds
-                            and related environmental factors used for advisories and operational decisions.
-                        </p>
-
-                        <div class="threshold-table-wrapper" role="region" aria-label="Heat index thresholds (PAGASA) table">
-                            <table class="threshold-table">
-                                <thead>
-                                    <tr>
-                                        <th scope="col">Heat Index (&deg;C)</th>
-                                        <th scope="col">Category</th>
-                                        <th scope="col">Advisory Notes</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr>
-                                        <td>27&deg;C &ndash; 32&deg;C</td>
-                                        <td><strong>Caution</strong></td>
-                                        <td>Possible: fatigue with prolonged exposure. Low risk, but still uncomfortable.</td>
-                                    </tr>
-                                    <tr>
-                                        <td>33&deg;C &ndash; 41&deg;C</td>
-                                        <td><strong>Extreme Caution</strong></td>
-                                        <td>
-                                            Higher chance of heat cramps. Possible heat exhaustion. Extra hydration and breaks needed.
-                                            Vulnerable groups (children, elderly) are more at risk.
-                                        </td>
-                                    </tr>
-                                    <tr>
-                                        <td>42&deg;C &ndash; 51&deg;C</td>
-                                        <td><strong>Danger</strong></td>
-                                        <td>
-                                            Likely: heat cramps and heat exhaustion. Heat stroke becomes possible with prolonged exposure.
-                                            Outdoor activities become risky. This is often the reference point the City of Cabuyao use when considering suspending classes.
-                                        </td>
-                                    </tr>
-                                    <tr>
-                                        <td>52&deg;C and above</td>
-                                        <td><strong>Extreme Danger</strong></td>
-                                        <td>
-                                            Heat stroke highly likely. Very unsafe for outdoor activities and prolonged exposure.
-                                            Immediate protective measures required.
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-
-                        <div class="threshold-grid">
-                            <div class="threshold-item">
-                                <h4>1. Air Temperature Thresholds</h4>
-                                <p><strong>High temperature</strong> (e.g., <strong>33&deg;C and above</strong>) increases heat stress on the body.</p>
-                                <p class="threshold-note">Used to identify when heat index is likely to reach dangerous levels.</p>
-                            </div>
-
-                            <div class="threshold-item">
-                                <h4>2. Relative Humidity Thresholds</h4>
-                                <p><strong>High humidity</strong> (with <strong>60% and above</strong>) reduces the body's ability to cool through sweating.</p>
-                                <p class="threshold-note">Humidity combined with temperature is what forms the heat index.</p>
-                            </div>
-
-                            <div class="threshold-item">
-                                <h4>4. Wind Speed Thresholds</h4>
-                                <p><strong>Low wind speed</strong> increases heat stress because it reduces natural cooling.</p>
-                                <p class="threshold-note">Calm conditions (<strong>below 5 km/h</strong>) can aggravate high heat index levels.</p>
-                            </div>
-
-                            <div class="threshold-item">
-                                <h4>5. Solar Radiation / Sun Exposure</h4>
-                                <p><strong>High sunlight exposure</strong> further increases perceived heat.</p>
-                                <p class="threshold-note">Outdoor activities become more dangerous even at lower heat index values.</p>
-                            </div>
-
-                            <div class="threshold-item">
-                                <h4>6. Time-of-Day Threshold</h4>
-                                <p>Heat index is highest between <strong>11:00 AM to 4:00 PM</strong>.</p>
-                                <p class="threshold-note">Important for class scheduling, PE activities, and outdoor school events.</p>
-                            </div>
-
-                            <div class="threshold-item">
-                                <h4>7. Indoor Temperature and Ventilation Thresholds</h4>
-                                <p>Classrooms above <strong>35&deg;C</strong> and with poor ventilation increase health risks for students and staff.</p>
-                                <p class="threshold-note">Used by school heads to decide on suspending in-person classes.</p>
+                        <!-- Software Architecture -->
+                        <div class="about-section">
+                            <h3>💻 Software Architecture</h3>
+                            <div class="stack-grid">
+                                <div class="stack-item">
+                                    <strong>Backend:</strong> Node.js, Express.js, Firebase Admin SDK
+                                </div>
+                                <div class="stack-item">
+                                    <strong>Frontend:</strong> Three.js, Chart.js, Vanilla JavaScript
+                                </div>
+                                <div class="stack-item">
+                                    <strong>Database:</strong> Firebase Firestore
+                                </div>
+                                <div class="stack-item">
+                                    <strong>AI Service:</strong> OpenAI GPT-4o-mini for natural language explanation
+                                </div>
+                                <div class="stack-item">
+                                    <strong>3D Assets:</strong> GLB/GLTF classroom digital twin model
+                                </div>
                             </div>
                         </div>
 
-                        <p class="threshold-prepared">
-                            <strong>Prepared by:</strong> Vincent Paul L. Buot, RN, MDRM &mdash; Local DRRM Officer IV
-                        </p>
-                    </div>
-
-                    <!-- Hardware Components -->
-                    <div class="about-section">
-                        <h3>🔧 Hardware Components</h3>
-                        <ul class="component-list">
-                            <li><strong>ESP32 Microcontroller</strong> - Main processing unit with WiFi/Bluetooth connectivity</li>
-                            <li><strong>AHT20 Sensor</strong> - Digital temperature and humidity measurement</li>
-                            <li><strong>MLX90640</strong> - 32×24 pixel thermal imaging array for heat mapping</li>
-                            <li><strong>TFT Display</strong> - Local real-time data visualization</li>
-                        </ul>
-                    </div>
-
-                    <!-- Software Stack -->
-                    <div class="about-section">
-                        <h3>💻 Software Architecture</h3>
-                        <div class="stack-grid">
-                            <div class="stack-item">
-                                <strong>Backend:</strong> Node.js, Express.js, Firebase Admin SDK
-                            </div>
-                            <div class="stack-item">
-                                <strong>Frontend:</strong> Three.js (3D), Chart.js (Graphs), Vanilla JavaScript
-                            </div>
-                            <div class="stack-item">
-                                <strong>Database:</strong> Firebase Firestore (Real-time NoSQL)</li>
-                            </div>
-                            <div class="stack-item">
-                                <strong>AI Service:</strong> OpenAI GPT-4o-mini for natural language explanations
-                            </div>
-                            <div class="stack-item">
-                                <strong>3D Assets:</strong> GLB/GLTF format classroom models
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Data Flow -->
-                    <div class="about-section">
-                        <h3>📡 Data Flow Architecture</h3>
-                        <ol class="flow-list">
-                            <li>Sensors (ESP32 + AHT20 + MLX90640) collect environmental data</li>
-                            <li>Data transmitted via WiFi to Firebase Firestore</li>
-                            <li>Backend server (Node.js/Express) processes and computes Heat Index</li>
-                            <li>3D Digital Twin receives thermal data for volumetric heat visualization</li>
-                            <li>Dashboard displays real-time metrics, charts, and AI-powered advisories</li>
-                            <li>AI Assistant provides contextual explanations based on current conditions</li>
-                        </ol>
-                    </div>
-
-                    <!-- Thermal Visualization -->
-                    <div class="about-section">
-                        <h3>🔥 Thermal Heatmap Visualization</h3>
-                        <p>The system employs <strong>volumetric heat propagation</strong> using 12 depth slices that simulate heat diffusion from the front wall into the classroom space. Each slice has:</p>
-                        <ul>
-                            <li>Exponential decay based on distance from source</li>
-                            <li>Time-lagged updates creating wave/ripple effects</li>
-                            <li>HSL color mapping (Blue → Red) for temperature gradients</li>
-                            <li>Emissive glow effects for realistic heat radiation</li>
-                        </ul>
-                    </div>
-
-                    <!-- Fallback Mechanisms -->
-                    <div class="about-section">
-                        <h3>🛡️ Fallback & Safety Mechanisms</h3>
-                        <ul>
-                            <li><strong>Backend Unavailable:</strong> Local heat index estimation using simplified formula</li>
-                            <li><strong>Sensor Timeout:</strong> 6-second watchdog timer with visual degradation</li>
-                            <li><strong>WorldTimeAPI Failure:</strong> Automatic fallback to browser local time</li>
-                            <li><strong>AI Service Down:</strong> Structured text response with current sensor values</li>
-                        </ul>
-                    </div>
-
-                    <!-- Multi-Room Support -->
-                    <div class="about-section">
-                        <h3>🏢 Multi-Room Architecture</h3>
-                        <p>The system supports monitoring multiple rooms simultaneously with independent:</p>
-                        <ul>
-                            <li>Sensor data streams (front and back sensors per room)</li>
-                            <li>Thermal imaging feeds (32×24 pixel arrays per room)</li>
-                            <li>Heat Index calculations and advisories per zone</li>
-                            <li>Real-time switching between rooms via navigation panel</li>
-                        </ul>
                     </div>
                 </div>
 
-                <!-- FOOTER -->
                 <footer class="dashboard-footer">
                     <div class="footer-content">
                         <p class="footer-copyright">@2026 created by</p>
@@ -435,36 +435,33 @@ HI = -42.379 + 2.04901523×T + 10.14333127×R
             </section>
         </main>
 
-        <!-- RIGHT SIDEBAR (AI CHAT) -->
+        <!-- RIGHT SIDEBAR -->
         <aside class="sidebar-right">
             <div class="chat-header">AI Assistant</div>
 
             <div class="chat-container">
-                <div id="chat-messages"></div>
+                <div id="chat-messages">
+                </div>
+
                 <div class="chat-input-row">
-                    <input 
+                    <input
                         type="text"
                         id="chat-input"
-                        placeholder="Type your question..."
+                        placeholder="Type your question here..."
+                        autocomplete="off"
                     />
-                    <button id="chat-send">Send</button>
+                    <button id="chat-send" type="button">Send</button>
                 </div>
             </div>
 
-            <!-- DATE & TIME DISPLAY -->
+            <!-- DATE & TIME -->
             <div class="datetime-box">
                 <div id="ph-time">--:--</div>
-                <div id="ph-date">---, -- --- ----</div>
+                <div id="ph-date">Loading date...</div>
             </div>
         </aside>
-
     </div>
-    <!-- ======= GRID LAYOUT END ======= -->
 
-    <!-- MAIN JS MODULE -->
-    <script type="module">
-    import './main.js';
-    import './chatAi.js';
-    </script>
+    <script type="module" src="main.js"></script>
 </body>
 </html>

@@ -602,26 +602,60 @@ function initThreeJS() {
       "https://firebasestorage.googleapis.com/v0/b/dss-database-51609.firebasestorage.app/o/classroom.glb?alt=media&token=caa4c4ed-3241-4a78-95c5-b1ea4947832a";
     const GLB_CACHE_KEY = "glb_model_cache";
     const GLB_CACHE_VERSION = 1;
+    const GLB_CACHE_DB = "glb_cache_db";
+    const GLB_CACHE_STORE = "models";
+    const GLB_CACHE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
     const LOAD_TIMEOUT_MS = 120000; // 2 minutes for weak WiFi
 
     /**
-     * Try to load from localStorage cache
+     * Open IndexedDB cache
      */
-    function getCachedModel() {
-      try {
-        const cached = localStorage.getItem(GLB_CACHE_KEY);
-        if (cached) {
-          const { version, data, timestamp } = JSON.parse(cached);
-          const cacheAge = Date.now() - timestamp;
-          if (
-            version === GLB_CACHE_VERSION &&
-            cacheAge < 30 * 24 * 60 * 60 * 1000
-          ) {
-            // Cache valid for 30 days
-            console.log("Loading GLB from cache");
-            return data;
+    function openGLBCacheDB() {
+      return new Promise((resolve, reject) => {
+        const request = indexedDB.open(GLB_CACHE_DB, 1);
+        request.onupgradeneeded = () => {
+          const db = request.result;
+          if (!db.objectStoreNames.contains(GLB_CACHE_STORE)) {
+            db.createObjectStore(GLB_CACHE_STORE);
           }
-        }
+        };
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+    }
+
+    /**
+     * Try to load from IndexedDB cache
+     */
+    async function getCachedModel() {
+      try {
+        const db = await openGLBCacheDB();
+        return await new Promise((resolve, reject) => {
+          const tx = db.transaction(GLB_CACHE_STORE, "readonly");
+          const store = tx.objectStore(GLB_CACHE_STORE);
+          const request = store.get(GLB_CACHE_KEY);
+
+          request.onsuccess = () => {
+            const cached = request.result;
+            if (cached) {
+              const cacheAge = Date.now() - cached.timestamp;
+              if (
+                cached.version === GLB_CACHE_VERSION &&
+                cacheAge < GLB_CACHE_MAX_AGE_MS &&
+                cached.data instanceof ArrayBuffer
+              ) {
+                console.log("Loading GLB from cache");
+                resolve(cached.data);
+                return;
+              }
+            }
+            resolve(null);
+          };
+
+          request.onerror = () => reject(request.error);
+          tx.oncomplete = () => db.close();
+          tx.onerror = () => db.close();
+        });
       } catch (err) {
         console.warn("Could not read GLB cache:", err);
       }
@@ -631,17 +665,29 @@ function initThreeJS() {
     /**
      * Save model to cache
      */
-    function cacheModel(arrayBuffer) {
+    async function cacheModel(arrayBuffer) {
       try {
-        const data = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
-        localStorage.setItem(
-          GLB_CACHE_KEY,
-          JSON.stringify({
-            version: GLB_CACHE_VERSION,
-            data,
-            timestamp: Date.now(),
-          })
-        );
+        const db = await openGLBCacheDB();
+        await new Promise((resolve, reject) => {
+          const tx = db.transaction(GLB_CACHE_STORE, "readwrite");
+          const store = tx.objectStore(GLB_CACHE_STORE);
+          store.put(
+            {
+              version: GLB_CACHE_VERSION,
+              data: arrayBuffer,
+              timestamp: Date.now(),
+            },
+            GLB_CACHE_KEY
+          );
+          tx.oncomplete = () => {
+            db.close();
+            resolve();
+          };
+          tx.onerror = () => {
+            db.close();
+            reject(tx.error);
+          };
+        });
         console.log("GLB model cached");
       } catch (err) {
         console.warn("Could not cache GLB model:", err);
@@ -769,7 +815,7 @@ function initThreeJS() {
 
     try {
       // Try cache first
-      let glbData = getCachedModel();
+      let glbData = await getCachedModel();
       let isFromCache = true;
 
       if (!glbData) {
@@ -780,22 +826,14 @@ function initThreeJS() {
         }
         console.log("Fetching GLB from network");
         glbData = await fetchGLBWithTimeout(GLB_URL);
-        cacheModel(glbData);
+        await cacheModel(glbData);
       }
 
       // Parse GLB
       if (loadingOverlay && !isFromCache) {
         loadingOverlay.textContent = "Parsing 3D Model... 99%";
       }
-      const binaryString = atob(
-        typeof glbData === "string" ? glbData : btoa(String.fromCharCode(...new Uint8Array(glbData)))
-      );
-      const bytes = new Uint8Array(binaryString.length);
-      for (let i = 0; i < binaryString.length; i++) {
-        bytes[i] = binaryString.charCodeAt(i);
-      }
-
-      const gltf = await parseGLB(bytes.buffer);
+      const gltf = await parseGLB(glbData);
 
       if (loadingOverlay) {
         loadingOverlay.style.display = "none";

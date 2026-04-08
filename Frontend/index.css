@@ -751,6 +751,13 @@ canvas {
     gap: 0.5rem;
     position: relative;
     min-height: 0;
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+
+#dss-card:hover {
+    box-shadow: var(--shadow-hover);
+    transform: translateY(-2px);
 }
 
 #dss-card h3 {
@@ -777,15 +784,29 @@ canvas {
     word-break: break-word;
     flex: 1;
     min-height: 0;
+    transition: all 0.3s ease;
 }
 
-#dss-source {
+#dss-sources {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-top: auto;
     font-size: 0.7rem;
     color: #555;
-    text-align: right;
-    position: static;
-    margin-top: auto;
     opacity: 0.9;
+}
+
+#dss-source-left,
+#dss-source-right {
+    margin: 0;
+    padding: 0;
+    flex: 1;
+    word-break: break-word;
+}
+
+#dss-source-right {
+    text-align: right;
 }
 
 /* -------------------------------------------------

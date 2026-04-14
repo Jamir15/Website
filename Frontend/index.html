@@ -78,48 +78,74 @@
 
             <!-- DASHBOARD VIEW -->
             <div id="dashboard-view">
-                <div class="threejs-chart-wrapper">
-                    <div class="threejs-wrapper">
-                        <div id="canvas-container"></div>
-                        <div id="loading-overlay">Loading Model...</div>
-                    </div>
+                <section class="monitor-shell">
 
-                    <div class="chart-container">
-                        <canvas id="sensorChart"></canvas>
-                    </div>
-                </div>
+                    <!-- FULL MAIN 3D STAGE -->
+                    <div class="viewer-stage-shell">
+                        <div class="viewer-stage-header">
+                            <div class="viewer-title-group">
+                                <p class="viewer-eyebrow">Digital Twin Monitoring</p>
+                                <h2 class="viewer-title">Classroom Environmental Viewer</h2>
+                            </div>
 
-                <div class="data-cards">
-                    <div class="card">
-                        <h3><span class="card-emoji">🌡️</span> Temperature</h3>
-                        <div class="value"><span id="temp-val">--</span> °C</div>
-                    </div>
+                            <div class="viewer-room-badge">
+                                <span id="active-room-badge">Room 1</span>
+                            </div>
+                        </div>
 
-                    <div class="card">
-                        <h3><span class="card-emoji">💧</span> Humidity</h3>
-                        <div class="value"><span id="hum-val">--</span> %</div>
-                    </div>
+                        <div class="viewer-stage">
+                            <div id="canvas-container"></div>
+                            <div id="loading-overlay">Loading Model...</div>
+                        </div>
 
-                    <div class="card">
-                        <h3><span class="card-emoji">🔥</span> Heat Index</h3>
-                        <div class="value"><span id="hi-val">--</span> °C</div>
-                    </div>
-                </div>
+                        <!-- FLOATING RIGHT PANELS INSIDE MAIN CONTENT -->
+                        <aside class="monitor-details-panel">
 
-                <div class="card" id="dss-card">
-                    <div class="dss-header">
-                        <h3 id="dss-title">Heat Index Advisory (Decision Support System): --</h3>
-                    </div>
+                            <!-- ROOM AVERAGE SUMMARY -->
+                            <section class="details-card room-summary-card">
+                                <div class="details-card-header">
+                                    <p class="details-kicker">Room Summary</p>
+                                    <h3 class="details-card-title">Averaged Environmental Readings</h3>
+                                </div>
 
-                        <div id="dss-content">
-                        <p>Waiting data...</p>
-                    </div>
+                                <div class="summary-metrics">
+                                    <div class="summary-metric">
+                                        <p class="summary-label">Temperature</p>
+                                        <p class="summary-value"><span id="temp-val">--</span> <span class="unit">°C</span></p>
+                                    </div>
 
-                    <div id="dss-sources">
-                        <p id="dss-source-left">Based on CDRRMO Heat Index Threshold Guidelines</p>
-                        <p id="dss-source-right">Based on 4 sensor positions</p>
+                                    <div class="summary-metric">
+                                        <p class="summary-label">Humidity</p>
+                                        <p class="summary-value"><span id="hum-val">--</span> <span class="unit">%</span></p>
+                                    </div>
+
+                                    <div class="summary-metric">
+                                        <p class="summary-label">Heat Index</p>
+                                        <p class="summary-value"><span id="hi-val">--</span> <span class="unit">°C</span></p>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <!-- DSS / SYSTEM ADVISORY -->
+                            <section class="details-card dss-modern-card" id="dss-card">
+                                <div class="details-card-header">
+                                    <p class="details-kicker">Decision Support</p>
+                                    <h3 id="dss-title">Heat Index Advisory (Decision Support System): --</h3>
+                                </div>
+
+                                <div id="dss-content">
+                                    <p>Waiting data...</p>
+                                </div>
+
+                                <div id="dss-sources">
+                                    <p id="dss-source-left">Based on CDRRMO Heat Index Threshold Guidelines</p>
+                                    <p id="dss-source-right">Based on 4 sensor positions</p>
+                                </div>
+                            </section>
+
+                        </aside>
                     </div>
-                </div>
+                </section>
             </div>
 
             <!-- SETTINGS VIEW -->
@@ -435,11 +461,37 @@ HI = -42.379 + 2.04901523×T + 10.14333127×R
             </section>
         </main>
 
-        <!-- RIGHT SIDEBAR -->
-        <aside class="sidebar-right">
-            <div class="chat-header">AI Assistant</div>
+        <!-- ASSISTANT CHAT TOGGLE -->
+        <button
+            id="assistant-chat-toggle"
+            class="assistant-chat-toggle"
+            type="button"
+            aria-label="Open assistant chat"
+            aria-controls="assistant-chat-panel"
+            aria-expanded="false"
+        >
+            Chat
+        </button>
 
-            <div class="chat-container">
+        <!-- ASSISTANT CHAT PANEL -->
+        <aside
+            id="assistant-chat-panel"
+            class="assistant-chat-panel"
+            aria-hidden="true"
+        >
+            <div class="assistant-chat-header-row">
+                <div class="assistant-chat-header">AI Assistant</div>
+                <button
+                    id="assistant-chat-close"
+                    class="assistant-chat-close"
+                    type="button"
+                    aria-label="Close assistant chat"
+                >
+                    ×
+                </button>
+            </div>
+
+            <div class="assistant-chat-container">
                 <div id="chat-messages">
                 </div>
 

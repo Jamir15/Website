@@ -1,12 +1,17 @@
 /* =====================================================================
- * main.js – DSS Dashboard – ESP8266 + BMP280 + Firestore
+ * main.js – DSS Dashboard
  * Three.js viewer + Firestore real-time listener
+ * Modern center monitoring layout with live floating sensor readings
  * ===================================================================== */
 console.log("MAIN.JS IS RUNNING");
 
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import {
+  CSS2DRenderer,
+  CSS2DObject,
+} from "three/addons/renderers/CSS2DRenderer.js";
 import { initializeApp } from "firebase/app";
 import { getFirestore, doc, getDoc, onSnapshot } from "firebase/firestore";
 import { Chart, registerables } from "chart.js/auto";
@@ -16,7 +21,7 @@ let backendDown = false;
 let connectionQuality = "good"; // good, fair, poor
 let consecutiveFailures = 0;
 const MAX_RETRIES = 3;
-const FETCH_TIMEOUT_MS = 8000; // 8 second timeout for weak WiFi
+const FETCH_TIMEOUT_MS = 8000;
 let lastSuccessfulData = null;
 
 Chart.register(...registerables);
@@ -24,7 +29,7 @@ const BACKEND_URL = "https://website-jbd4.onrender.com";
 const REAL_ROOM_ID = "room1";
 
 /* =====================================================================
- * UI Helpers (Toast + Download State)
+ * UI Helpers
  * ===================================================================== */
 
 function showToast(message, variant = "info") {
@@ -52,7 +57,60 @@ function showToast(message, variant = "info") {
 }
 
 /* =====================================================================
- * AI SHARED STATE (latest sensor snapshot)
+ * ASSISTANT CHAT COLLAPSE / EXPAND
+ * ===================================================================== */
+
+let isAssistantChatOpen = false;
+
+function syncAssistantChatUI(open) {
+  const toggleButton = document.getElementById("assistant-chat-toggle");
+  const assistantPanel = document.getElementById("assistant-chat-panel");
+
+  document.body.classList.toggle("assistant-chat-open", open);
+
+  if (toggleButton) {
+    toggleButton.setAttribute("aria-expanded", String(open));
+    toggleButton.setAttribute(
+      "aria-label",
+      open ? "Close assistant chat" : "Open assistant chat",
+    );
+  }
+
+  if (assistantPanel) {
+    assistantPanel.setAttribute("aria-hidden", String(!open));
+  }
+
+  setTimeout(() => {
+    window.dispatchEvent(new Event("resize"));
+  }, 300);
+}
+
+function setAssistantChatOpen(open) {
+  isAssistantChatOpen = open;
+  syncAssistantChatUI(open);
+}
+
+function setupAssistantChatToggle() {
+  const toggleButton = document.getElementById("assistant-chat-toggle");
+  const closeButton = document.getElementById("assistant-chat-close");
+
+  if (toggleButton) {
+    toggleButton.addEventListener("click", () => {
+      setAssistantChatOpen(true);
+    });
+  }
+
+  if (closeButton) {
+    closeButton.addEventListener("click", () => {
+      setAssistantChatOpen(false);
+    });
+  }
+
+  setAssistantChatOpen(false);
+}
+
+/* =====================================================================
+ * AI SHARED STATE
  * ===================================================================== */
 
 let latestAIContext = {
@@ -67,7 +125,7 @@ let latestAIContext = {
 let worldTimeApiFailed = false;
 
 /* =====================================================================
- * 1. Firebase configuration
+ * Firebase configuration
  * ===================================================================== */
 
 const firebaseConfig = {
@@ -84,7 +142,7 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
 /* =====================================================================
- * THERMAL FIRESTORE LISTENER Heat Mapping Logic
+ * THERMAL FIRESTORE LISTENER
  * ===================================================================== */
 
 const thermalDataByRoom = {};
@@ -97,9 +155,6 @@ function initThermalRecoveryState(roomId) {
   }
 }
 
-/**
- * Initialize thermal room state on startup
- */
 async function initializeThermalRoom(roomId) {
   if (!thermalDataByRoom[roomId]) {
     thermalDataByRoom[roomId] = {
@@ -111,14 +166,12 @@ async function initializeThermalRoom(roomId) {
       restoreVisual: false,
     };
   }
-  
-  // Fetch last thermal data from Firestore
+
   try {
     const ref = doc(db, "thermalRooms", roomId);
     const snap = await (async () => {
-      // Wrap with timeout
       const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error("Thermal fetch timeout")), 5000)
+        setTimeout(() => reject(new Error("Thermal fetch timeout")), 5000),
       );
       const docPromise = getDoc(ref);
       return Promise.race([docPromise, timeoutPromise]);
@@ -143,10 +196,8 @@ async function initializeThermalRoom(roomId) {
 
 function listenToThermal(roomId = REAL_ROOM_ID) {
   initThermalRecoveryState(roomId);
-  
-  // Initialize with last data first
   initializeThermalRoom(roomId);
-  
+
   const ref = doc(db, "thermalRooms", roomId);
 
   onSnapshot(ref, (snap) => {
@@ -191,7 +242,7 @@ function listenToThermal(roomId = REAL_ROOM_ID) {
 }
 
 /* =====================================================================
- * 2. DSS BACKEND CONNECTOR
+ * Fallback heat index
  * ===================================================================== */
 
 function computeFallbackHeatIndex(tempC, humidity) {
@@ -208,14 +259,20 @@ function computeFallbackHeatIndex(tempC, humidity) {
 }
 
 /* =====================================================================
- * ROOM SELECTION LOGIC
+ * ROOM SELECTION / VIEW STATE
  * ===================================================================== */
 
 let activeRoom = REAL_ROOM_ID;
 let isHeatmapEnabled = true;
 let activeView = "dashboard";
-let lastDashboardState = null; // Cache last dashboard data
-let heatSlices = []; // Global reference for toggle control
+let lastDashboardState = null;
+let heatSlices = [];
+
+function setActiveRoomBadge(roomName) {
+  const badge = document.getElementById("active-room-badge");
+  if (!badge) return;
+  badge.textContent = roomName === "room2" ? "Room 2" : "Room 1";
+}
 
 function setActiveView(viewName) {
   const dashboardView = document.getElementById("dashboard-view");
@@ -228,8 +285,9 @@ function setActiveView(viewName) {
   activeView = viewName;
   const showSettings = viewName === "settings";
   const showAbout = viewName === "about";
+  const showDashboard = !showSettings && !showAbout;
 
-  dashboardView.classList.toggle("view-hidden", showSettings || showAbout);
+  dashboardView.classList.toggle("view-hidden", !showDashboard);
   settingsView.classList.toggle("view-hidden", !showSettings);
   aboutView.classList.toggle("view-hidden", !showAbout);
 
@@ -237,6 +295,15 @@ function setActiveView(viewName) {
     const isActive = link.dataset.view === viewName;
     link.classList.toggle("active", isActive);
   });
+
+  if (showDashboard) {
+    requestAnimationFrame(() => {
+      window.dispatchEvent(new Event("resize"));
+      setTimeout(() => {
+        window.dispatchEvent(new Event("resize"));
+      }, 250);
+    });
+  }
 }
 
 function setConditionBannerPlaceholder(titleText, descText) {
@@ -258,16 +325,209 @@ function setConditionBannerPlaceholder(titleText, descText) {
   desc.textContent = descText;
 }
 
+/* =====================================================================
+ * SENSOR VISUAL STATE
+ * ===================================================================== */
+
+const SENSOR_KEYS = ["front", "back", "left", "right"];
+
+const defaultSensorState = {
+  front: {
+    name: "Front Sensor",
+    temperature: null,
+    humidity: null,
+    heatIndex: null,
+    label: "Waiting Data",
+    advisory: ["Waiting data..."],
+  },
+  back: {
+    name: "Back Sensor",
+    temperature: null,
+    humidity: null,
+    heatIndex: null,
+    label: "Waiting Data",
+    advisory: ["Waiting data..."],
+  },
+  left: {
+    name: "Left Sensor",
+    temperature: null,
+    humidity: null,
+    heatIndex: null,
+    label: "Waiting Data",
+    advisory: ["Waiting data..."],
+  },
+  right: {
+    name: "Right Sensor",
+    temperature: null,
+    humidity: null,
+    heatIndex: null,
+    label: "Waiting Data",
+    advisory: ["Waiting data..."],
+  },
+};
+
+let latestSensorState = JSON.parse(JSON.stringify(defaultSensorState));
+
+function formatMetricValue(value, unit = "") {
+  const num = Number(value);
+  if (Number.isFinite(num)) {
+    return `${num.toFixed(1)}${unit ? ` ${unit}` : ""}`;
+  }
+  return `--${unit ? ` ${unit}` : ""}`;
+}
+
+function toAdvisoryArray(advisory) {
+  if (Array.isArray(advisory)) return advisory;
+  if (typeof advisory === "string" && advisory.trim()) return [advisory];
+  return ["No advisory available."];
+}
+
+function setSensorStateFromRoomData(roomData) {
+  const avgTemp = Number(roomData.averageTemperature);
+  const avgHum = Number(roomData.averageHumidity);
+  const avgHi = Number(roomData.heatIndex);
+  const avgLabel = roomData.label || "Waiting Data";
+  const avgAdvisory = toAdvisoryArray(roomData.advisory);
+
+  const nextState = JSON.parse(JSON.stringify(defaultSensorState));
+
+  SENSOR_KEYS.forEach((key) => {
+    nextState[key].temperature = Number.isFinite(avgTemp) ? avgTemp : null;
+    nextState[key].humidity = Number.isFinite(avgHum) ? avgHum : null;
+    nextState[key].heatIndex = Number.isFinite(avgHi) ? avgHi : null;
+    nextState[key].label = avgLabel;
+    nextState[key].advisory = avgAdvisory;
+  });
+
+  const candidateContainers = [
+    roomData.sensorNodes,
+    roomData.sensors,
+    roomData.nodes,
+    roomData.positions,
+    roomData.positionData,
+    roomData.nodeData,
+  ].filter(Boolean);
+
+  const readCandidate = (candidate) => {
+    if (!candidate || typeof candidate !== "object") return null;
+
+    const temp =
+      candidate.temperature ??
+      candidate.temp ??
+      candidate.airTemperature ??
+      candidate.averageTemperature;
+
+    const hum =
+      candidate.humidity ??
+      candidate.rh ??
+      candidate.relativeHumidity ??
+      candidate.averageHumidity;
+
+    const hi =
+      candidate.heatIndex ??
+      candidate.heat_index ??
+      candidate.hi ??
+      candidate.calculatedHeatIndex;
+
+    const label =
+      candidate.label ??
+      candidate.status ??
+      candidate.risk ??
+      candidate.category ??
+      avgLabel;
+
+    const advisory = candidate.advisory ?? candidate.message ?? avgAdvisory;
+
+    return {
+      temperature: Number(temp),
+      humidity: Number(hum),
+      heatIndex: Number(hi),
+      label: label || avgLabel,
+      advisory: toAdvisoryArray(advisory),
+    };
+  };
+
+  for (const container of candidateContainers) {
+    SENSOR_KEYS.forEach((key) => {
+      const direct = container[key];
+      const alt =
+        container[key.toUpperCase()] ||
+        container[`${key}Node`] ||
+        container[`${key}_node`] ||
+        container[`${key}Sensor`] ||
+        container[`${key}_sensor`];
+
+      const found = readCandidate(direct || alt);
+      if (!found) return;
+
+      if (Number.isFinite(found.temperature))
+        nextState[key].temperature = found.temperature;
+      if (Number.isFinite(found.humidity))
+        nextState[key].humidity = found.humidity;
+      if (Number.isFinite(found.heatIndex))
+        nextState[key].heatIndex = found.heatIndex;
+      nextState[key].label = found.label;
+      nextState[key].advisory = found.advisory;
+    });
+  }
+
+  latestSensorState = nextState;
+
+  if (threeApp) {
+    threeApp.updateSensorVisuals(latestSensorState);
+  }
+}
+
+function setReservedSensorVisualState() {
+  latestSensorState = {
+    front: {
+      name: "Front Sensor",
+      temperature: null,
+      humidity: null,
+      heatIndex: null,
+      label: "Reserved",
+      advisory: ["Room 2 is reserved for future expansion."],
+    },
+    back: {
+      name: "Back Sensor",
+      temperature: null,
+      humidity: null,
+      heatIndex: null,
+      label: "Reserved",
+      advisory: ["Room 2 is reserved for future expansion."],
+    },
+    left: {
+      name: "Left Sensor",
+      temperature: null,
+      humidity: null,
+      heatIndex: null,
+      label: "Reserved",
+      advisory: ["Room 2 is reserved for future expansion."],
+    },
+    right: {
+      name: "Right Sensor",
+      temperature: null,
+      humidity: null,
+      heatIndex: null,
+      label: "Reserved",
+      advisory: ["Room 2 is reserved for future expansion."],
+    },
+  };
+
+  if (threeApp) {
+    threeApp.updateSensorVisuals(latestSensorState);
+  }
+}
+
 function showReservedRoom2View() {
   document.getElementById("temp-val").textContent = "--";
   document.getElementById("hum-val").textContent = "--";
   document.getElementById("hi-val").textContent = "--";
 
   setAlertBannerVisible(false);
-  setConditionBannerPlaceholder(
-    "Reserved",
-    "",
-  );
+  setConditionBannerPlaceholder("Reserved", "");
+  setActiveRoomBadge("room2");
+  setReservedSensorVisualState();
 
   document.getElementById("dss-title").innerHTML =
     `Room 2 Status: <span style="color:#2563eb; font-size:1.2em; font-weight:bold;">Reserved for Future Expansion</span>`;
@@ -286,9 +546,7 @@ function showReservedRoom2View() {
 
   const sourceLeft = document.getElementById("dss-source-left");
   const sourceRight = document.getElementById("dss-source-right");
-  if (sourceLeft) {
-    sourceLeft.textContent = "";
-  }
+  if (sourceLeft) sourceLeft.textContent = "";
   if (sourceRight) {
     sourceRight.textContent = "Scalable multi-room dashboard architecture";
   }
@@ -306,6 +564,7 @@ function setupRoomClickHandlers() {
 
       activeRoom = link.dataset.room;
       setActiveView("dashboard");
+      setActiveRoomBadge(activeRoom);
       console.log("Active room changed to:", activeRoom);
 
       if (activeRoom === "room2") {
@@ -313,7 +572,6 @@ function setupRoomClickHandlers() {
         return;
       }
 
-      // If we have cached data for Room 1, display it immediately
       if (lastDashboardState && activeRoom === REAL_ROOM_ID) {
         updateDashboard(
           lastDashboardState.temp,
@@ -321,17 +579,18 @@ function setupRoomClickHandlers() {
           lastDashboardState.hi,
           lastDashboardState.label,
           lastDashboardState.advisory,
-          lastDashboardState.monitoringStatus
+          lastDashboardState.monitoringStatus,
+          lastDashboardState.roomData || null,
         );
       } else {
-        // Otherwise show loading message
         document.getElementById("dss-content").innerHTML =
           `<p>Loading live data for <b>${activeRoom.toUpperCase()}</b>...</p>`;
 
         const sourceLeft = document.getElementById("dss-source-left");
         const sourceRight = document.getElementById("dss-source-right");
         if (sourceLeft) {
-          sourceLeft.textContent = "Based on CDRRMO Heat Index Threshold Guidelines";
+          sourceLeft.textContent =
+            "Based on CDRRMO Heat Index Threshold Guidelines";
         }
         if (sourceRight) {
           sourceRight.textContent = "Based on 4 sensor positions";
@@ -386,8 +645,55 @@ function setupDarkModeToggle() {
 }
 
 /* =====================================================================
- * 3. Three.js viewer
+ * Three.js viewer
  * ===================================================================== */
+
+let threeApp = null;
+
+function buildSensorLabelElement(sensorName) {
+  const el = document.createElement("div");
+  el.style.display = "flex";
+  el.style.flexDirection = "column";
+  el.style.gap = "4px";
+  el.style.minWidth = "130px";
+  el.style.padding = "8px 10px";
+  el.style.borderRadius = "12px";
+  el.style.background = "rgba(255,255,255,0.92)";
+  el.style.border = "1px solid rgba(201,217,238,0.95)";
+  el.style.boxShadow = "0 10px 22px rgba(16,34,58,0.14)";
+  el.style.backdropFilter = "blur(8px)";
+  el.style.pointerEvents = "none";
+  el.style.userSelect = "none";
+  el.style.fontFamily = "Segoe UI, Tahoma, Geneva, Verdana, sans-serif";
+
+  const title = document.createElement("div");
+  title.textContent = sensorName;
+  title.style.fontSize = "11px";
+  title.style.fontWeight = "700";
+  title.style.letterSpacing = "0.06em";
+  title.style.textTransform = "uppercase";
+  title.style.color = "#55739b";
+
+  const primary = document.createElement("div");
+  primary.textContent = "-- °C";
+  primary.style.fontSize = "16px";
+  primary.style.fontWeight = "800";
+  primary.style.color = "#102845";
+  primary.style.lineHeight = "1.1";
+
+  const secondary = document.createElement("div");
+  secondary.textContent = "H --% · HI --°C";
+  secondary.style.fontSize = "11px";
+  secondary.style.fontWeight = "600";
+  secondary.style.color = "#4d6788";
+  secondary.style.lineHeight = "1.2";
+
+  el.appendChild(title);
+  el.appendChild(primary);
+  el.appendChild(secondary);
+
+  return { root: el, primary, secondary };
+}
 
 function initThreeJS() {
   const container = document.getElementById("canvas-container");
@@ -400,14 +706,46 @@ function initThreeJS() {
     0.1,
     1000,
   );
-  camera.position.set(0, 1, 3);
 
-  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.setSize(container.clientWidth, container.clientHeight);
   container.appendChild(renderer.domElement);
 
+  const labelRenderer = new CSS2DRenderer();
+  labelRenderer.setSize(container.clientWidth, container.clientHeight);
+  labelRenderer.domElement.style.position = "absolute";
+  labelRenderer.domElement.style.top = "0";
+  labelRenderer.domElement.style.left = "0";
+  labelRenderer.domElement.style.width = "100%";
+  labelRenderer.domElement.style.height = "100%";
+  labelRenderer.domElement.style.pointerEvents = "none";
+  container.appendChild(labelRenderer.domElement);
+
+  const ROOM_OFFSET_X = -3.5;
+  const DEFAULT_TARGET = new THREE.Vector3(ROOM_OFFSET_X, 0.95, -0.35);
+  const DEFAULT_CAMERA_POSITION = new THREE.Vector3(
+    ROOM_OFFSET_X - 5.0,
+    4.5,
+    9.2,
+  );
+
+  camera.position.copy(DEFAULT_CAMERA_POSITION);
+
   const controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
+  controls.dampingFactor = 0.08;
+  controls.rotateSpeed = 0.55;
+  controls.zoomSpeed = 0.85;
+  controls.panSpeed = 0.65;
+  controls.screenSpacePanning = false;
+  controls.enablePan = true;
+  controls.minDistance = 4.8;
+  controls.maxDistance = 15;
+  controls.minPolarAngle = 0.6;
+  controls.maxPolarAngle = 1.42;
+  controls.target.copy(DEFAULT_TARGET);
+  controls.update();
 
   const ROOM_WIDTH = 7.81;
   const ROOM_DEPTH = 6.92;
@@ -421,32 +759,23 @@ function initThreeJS() {
   heatmapCanvas.height = 24;
   const heatmapCtx = heatmapCanvas.getContext("2d");
 
-  // FLIR-style HSL color mapping: blue (240°) -> red (0°)
   function colorMapFLIR(value, minValue, maxValue) {
     let t = (value - minValue) / (maxValue - minValue);
     if (!isFinite(t)) t = 0;
     t = Math.max(0, Math.min(1, t));
-
-    // Emphasize hotter regions with power gamma
     t = Math.pow(t, 1.8);
-
-    // Hue: 240 (blue) -> 0 (red)
     const hue = (1 - t) * 240;
-    
-    // Brightness increases with temperature
     const light = 35 + t * 30;
-    
     return { hue, light };
   }
 
-  // Convert HSL to RGB
   function hslToRgb(h, l, s = 1.0) {
     function hue2rgb(p, q, t) {
       if (t < 0) t += 1;
       if (t > 1) t -= 1;
-      if (t < 1/6) return p + (q - p) * 6 * t;
-      if (t < 1/2) return q;
-      if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+      if (t < 1 / 6) return p + (q - p) * 6 * t;
+      if (t < 1 / 2) return q;
+      if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
       return p;
     }
 
@@ -458,15 +787,15 @@ function initThreeJS() {
     } else {
       const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
       const p = 2 * l - q;
-      r = hue2rgb(p, q, h + 1/3);
+      r = hue2rgb(p, q, h + 1 / 3);
       g = hue2rgb(p, q, h);
-      b = hue2rgb(p, q, h - 1/3);
+      b = hue2rgb(p, q, h - 1 / 3);
     }
 
     return {
       r: Math.round(r * 255),
       g: Math.round(g * 255),
-      b: Math.round(b * 255)
+      b: Math.round(b * 255),
     };
   }
 
@@ -481,13 +810,11 @@ function initThreeJS() {
     }
     if (maxT - minT < 2) maxT = minT + 2;
 
-    // Create ImageData for direct pixel manipulation
     const imageData = heatmapCtx.createImageData(32, 24);
     const data = imageData.data;
 
     for (let y = 0; y < 24; y++) {
       for (let x = 0; x < 32; x++) {
-        // Flip both axes for proper orientation (matching ESP32 code)
         const srcX = 31 - x;
         const srcY = 23 - y;
         const sensorIndex = srcY * 32 + srcX;
@@ -535,7 +862,6 @@ function initThreeJS() {
   scene.add(dir);
 
   heatmapTexture = new THREE.CanvasTexture(heatmapCanvas);
-  // Use linear filtering for smooth FLIR-style interpolation instead of blocky pixels
   heatmapTexture.minFilter = THREE.LinearFilter;
   heatmapTexture.magFilter = THREE.LinearFilter;
 
@@ -553,7 +879,6 @@ function initThreeJS() {
   const HEAT_BASE_EMISSIVE = 0.02;
   const HEAT_TRANSITION_LERP = 0.12;
 
-  // Clear and reuse global heatSlices array
   heatSlices.length = 0;
 
   for (let i = 0; i < HEAT_SLICE_COUNT; i++) {
@@ -570,7 +895,7 @@ function initThreeJS() {
     const slice = new THREE.Mesh(heatmapGeometry, material);
 
     slice.position.set(
-      0,
+      ROOM_OFFSET_X,
       0.1,
       FRONT_WALL_Z + DETACH_OFFSET + i * HEAT_SLICE_DEPTH,
     );
@@ -606,9 +931,122 @@ function initThreeJS() {
     });
   }
 
-  /**
-   * Optimized GLB loader with timeout, retry, and caching for weak WiFi
-   */
+  /* -------------------------------------------------
+     LIVE SENSOR MARKERS + FLOATING LABELS
+  -------------------------------------------------- */
+
+  const sensorGroup = new THREE.Group();
+  sensorGroup.position.x = ROOM_OFFSET_X;
+  scene.add(sensorGroup);
+
+  const markerGeometry = new THREE.SphereGeometry(0.06, 24, 24);
+  const markerLineMaterial = new THREE.LineBasicMaterial({
+    color: 0x86a9d8,
+    transparent: true,
+    opacity: 0.85,
+  });
+
+  const sensorPositions = {
+    front: new THREE.Vector3(0, 0.9, -2.1),
+    back: new THREE.Vector3(0, 0.9, 2.05),
+    left: new THREE.Vector3(-2.45, 0.9, 0),
+    right: new THREE.Vector3(2.45, 0.9, 0),
+  };
+
+  const sensorMarkers = {};
+
+  function getMarkerColorByLabel(label) {
+    switch (label) {
+      case "Normal":
+        return 0x2e9d5b;
+      case "Caution":
+        return 0xf1c40f;
+      case "Extreme Caution":
+        return 0xff8c00;
+      case "Danger":
+        return 0xe74c3c;
+      case "Extreme Danger":
+        return 0xb91c1c;
+      case "Reserved":
+        return 0x2563eb;
+      default:
+        return 0x3b82f6;
+    }
+  }
+
+  function createSensorMarker(sensorKey) {
+    const readable =
+      sensorKey.charAt(0).toUpperCase() + sensorKey.slice(1) + " Sensor";
+
+    const material = new THREE.MeshStandardMaterial({
+      color: 0x3b82f6,
+      emissive: 0x204f9c,
+      emissiveIntensity: 0.45,
+      roughness: 0.32,
+      metalness: 0.12,
+    });
+
+    const mesh = new THREE.Mesh(markerGeometry, material);
+    mesh.position.copy(sensorPositions[sensorKey]);
+    mesh.userData.baseY = sensorPositions[sensorKey].y;
+    sensorGroup.add(mesh);
+
+    const linePoints = [
+      new THREE.Vector3(0, -0.55, 0),
+      new THREE.Vector3(0, -0.08, 0),
+    ];
+    const lineGeometry = new THREE.BufferGeometry().setFromPoints(linePoints);
+    const line = new THREE.Line(lineGeometry, markerLineMaterial);
+    mesh.add(line);
+
+    const labelPieces = buildSensorLabelElement(readable);
+    const labelObject = new CSS2DObject(labelPieces.root);
+    labelObject.position.set(0, 0.22, 0);
+    mesh.add(labelObject);
+
+    sensorMarkers[sensorKey] = {
+      mesh,
+      line,
+      labelObject,
+      labelPrimary: labelPieces.primary,
+      labelSecondary: labelPieces.secondary,
+    };
+  }
+
+  SENSOR_KEYS.forEach(createSensorMarker);
+
+  function updateSensorVisuals(sensorState) {
+    SENSOR_KEYS.forEach((key) => {
+      const marker = sensorMarkers[key];
+      const state = sensorState[key];
+      if (!marker || !state) return;
+
+      const color = getMarkerColorByLabel(state.label);
+      marker.mesh.material.color.setHex(color);
+      marker.mesh.material.emissive.setHex(color);
+      marker.mesh.material.emissiveIntensity = 0.45;
+
+      marker.labelPrimary.textContent = formatMetricValue(
+        state.temperature,
+        "°C",
+      );
+      marker.labelSecondary.textContent = `H ${formatMetricValue(
+        state.humidity,
+        "%",
+      )} · HI ${formatMetricValue(state.heatIndex, "°C")}`;
+
+      marker.labelObject.element.style.transform = "scale(1)";
+      marker.labelObject.element.style.borderColor =
+        "rgba(201,217,238,0.95)";
+      marker.labelObject.element.style.boxShadow =
+        "0 10px 22px rgba(16,34,58,0.14)";
+    });
+  }
+
+  /* -------------------------------------------------
+     GLB LOADER
+  -------------------------------------------------- */
+
   async function loadGLBModel() {
     const GLB_URL =
       "https://firebasestorage.googleapis.com/v0/b/dss-database-51609.firebasestorage.app/o/classroom.glb?alt=media&token=caa4c4ed-3241-4a78-95c5-b1ea4947832a";
@@ -616,12 +1054,9 @@ function initThreeJS() {
     const GLB_CACHE_VERSION = 1;
     const GLB_CACHE_DB = "glb_cache_db";
     const GLB_CACHE_STORE = "models";
-    const GLB_CACHE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
-    const LOAD_TIMEOUT_MS = 120000; // 2 minutes for weak WiFi
+    const GLB_CACHE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
+    const LOAD_TIMEOUT_MS = 120000;
 
-    /**
-     * Open IndexedDB cache
-     */
     function openGLBCacheDB() {
       return new Promise((resolve, reject) => {
         const request = indexedDB.open(GLB_CACHE_DB, 1);
@@ -636,9 +1071,6 @@ function initThreeJS() {
       });
     }
 
-    /**
-     * Try to load from IndexedDB cache
-     */
     async function getCachedModel() {
       try {
         const db = await openGLBCacheDB();
@@ -674,9 +1106,6 @@ function initThreeJS() {
       return null;
     }
 
-    /**
-     * Save model to cache
-     */
     async function cacheModel(arrayBuffer) {
       try {
         const db = await openGLBCacheDB();
@@ -689,7 +1118,7 @@ function initThreeJS() {
               data: arrayBuffer,
               timestamp: Date.now(),
             },
-            GLB_CACHE_KEY
+            GLB_CACHE_KEY,
           );
           tx.oncomplete = () => {
             db.close();
@@ -706,9 +1135,6 @@ function initThreeJS() {
       }
     }
 
-    /**
-     * Fetch GLB with timeout and progress tracking - keeps retrying indefinitely on weak WiFi
-     */
     async function fetchGLBWithTimeout(url, retryCount = 0) {
       return new Promise((resolve, reject) => {
         const xhr = new XMLHttpRequest();
@@ -720,12 +1146,11 @@ function initThreeJS() {
         xhr.onprogress = (event) => {
           if (event.lengthComputable) {
             const percentComplete = Math.round(
-              (event.loaded / event.total) * 100
+              (event.loaded / event.total) * 100,
             );
             if (loadingOverlay) {
               loadingOverlay.textContent = `Loading 3D Model... ${percentComplete}%`;
             }
-            console.log(`GLB download: ${percentComplete}%`);
           }
         };
 
@@ -737,66 +1162,36 @@ function initThreeJS() {
           }
         };
 
-        xhr.onerror = () => {
-          reject(new Error("Network error"));
-        };
-
-        xhr.ontimeout = () => {
-          reject(new Error("Download timeout"));
-        };
-
+        xhr.onerror = () => reject(new Error("Network error"));
+        xhr.ontimeout = () => reject(new Error("Download timeout"));
         xhr.send();
-      })
-        .then((arrayBuffer) => {
-          return arrayBuffer;
-        })
-        .catch(async (error) => {
-          // Keep retrying indefinitely for weak WiFi
-          console.warn(
-            `GLB fetch attempt ${retryCount + 1} failed:`,
-            error.message
-          );
-          if (loadingOverlay) {
-            loadingOverlay.textContent = `Retrying... (weak WiFi detected)`;
-          }
-          
-          // Exponential backoff: 2s, 4s, 8s, 16s, 30s (max)
-          const backoffMs = Math.min(Math.pow(2, retryCount) * 2000, 30000);
-          console.log(
-            `Retrying GLB in ${backoffMs}ms (attempt ${retryCount + 1})...`
-          );
-          
-          await new Promise((resolve) => setTimeout(resolve, backoffMs));
-          return fetchGLBWithTimeout(url, retryCount + 1);
-        });
+      }).catch(async (error) => {
+        console.warn(
+          `GLB fetch attempt ${retryCount + 1} failed:`,
+          error.message,
+        );
+        if (loadingOverlay) {
+          loadingOverlay.textContent = `Retrying... (weak WiFi detected)`;
+        }
+
+        const backoffMs = Math.min(Math.pow(2, retryCount) * 2000, 30000);
+        await new Promise((resolve) => setTimeout(resolve, backoffMs));
+        return fetchGLBWithTimeout(url, retryCount + 1);
+      });
     }
 
-    /**
-     * Parse GLB from ArrayBuffer
-     */
     function parseGLB(arrayBuffer) {
       return new Promise((resolve, reject) => {
         const loader = new GLTFLoader();
-        loader.parse(
-          arrayBuffer,
-          "",
-          (gltf) => {
-            resolve(gltf);
-          },
-          reject
-        );
+        loader.parse(arrayBuffer, "", (gltf) => resolve(gltf), reject);
       });
     }
 
     const loadingOverlay = document.getElementById("loading-overlay");
 
-    /**
-     * Show placeholder geometry while loading on weak WiFi
-     */
     function createPlaceholder() {
       const group = new THREE.Group();
 
-      // Simple box representing the room
       const boxGeometry = new THREE.BoxGeometry(7, 2.6, 6.5);
       const boxMaterial = new THREE.MeshStandardMaterial({
         color: 0x888888,
@@ -805,43 +1200,36 @@ function initThreeJS() {
         metalness: 0.1,
       });
       const boxMesh = new THREE.Mesh(boxGeometry, boxMaterial);
-      boxMesh.position.set(0, 0.3, 0);
+      boxMesh.position.set(ROOM_OFFSET_X, 0.3, 0);
       group.add(boxMesh);
 
-      // Edges to make it more visible
       const edges = new THREE.EdgesGeometry(boxGeometry);
       const lineSegments = new THREE.LineSegments(
         edges,
-        new THREE.LineBasicMaterial({ color: 0x333333, linewidth: 2 })
+        new THREE.LineBasicMaterial({ color: 0x333333 }),
       );
-      lineSegments.position.set(0, 0.3, 0);
+      lineSegments.position.set(ROOM_OFFSET_X, 0.3, 0);
       group.add(lineSegments);
 
       return group;
     }
 
-    // Show placeholder immediately on weak WiFi
     const placeholder = createPlaceholder();
     scene.add(placeholder);
-    console.log("Placeholder geometry added");
 
     try {
-      // Try cache first
       let glbData = await getCachedModel();
       let isFromCache = true;
 
       if (!glbData) {
         isFromCache = false;
-        // Fetch from network
         if (loadingOverlay) {
           loadingOverlay.textContent = "Loading 3D Model...";
         }
-        console.log("Fetching GLB from network");
         glbData = await fetchGLBWithTimeout(GLB_URL);
         await cacheModel(glbData);
       }
 
-      // Parse GLB
       if (loadingOverlay && !isFromCache) {
         loadingOverlay.textContent = "Parsing 3D Model... 99%";
       }
@@ -851,15 +1239,33 @@ function initThreeJS() {
         loadingOverlay.style.display = "none";
       }
 
-      // Remove placeholder and add real model
       scene.remove(placeholder);
-      console.log("Placeholder removed, adding real model");
 
       const model = gltf.scene;
       const box = new THREE.Box3().setFromObject(model);
       const center = box.getCenter(new THREE.Vector3());
       model.position.sub(center);
+      model.position.x += ROOM_OFFSET_X;
       scene.add(model);
+
+      const size = box.getSize(new THREE.Vector3());
+      const maxDim = Math.max(size.x, size.y, size.z) || 7;
+
+      camera.position.set(
+        ROOM_OFFSET_X - 5.2,
+        Math.max(4.5, size.y * 0.95 + 2.0),
+        Math.max(8.0, maxDim * 1.35),
+      );
+
+      controls.target.set(
+        ROOM_OFFSET_X,
+        Math.max(0.85, size.y * 0.34),
+        -0.45,
+      );
+
+      controls.minDistance = Math.max(4.8, maxDim * 0.62);
+      controls.maxDistance = Math.max(15, maxDim * 2.3);
+      controls.update();
 
       console.log("GLB model loaded successfully");
     } catch (error) {
@@ -875,9 +1281,12 @@ function initThreeJS() {
   loadGLBModel();
 
   window.addEventListener("resize", () => {
-    camera.aspect = container.clientWidth / container.clientHeight;
+    const width = container.clientWidth;
+    const height = container.clientHeight;
+    camera.aspect = width / height;
     camera.updateProjectionMatrix();
-    renderer.setSize(container.clientWidth, container.clientHeight);
+    renderer.setSize(width, height);
+    labelRenderer.setSize(width, height);
   });
 
   let lastThermalLoopTime = 0;
@@ -900,8 +1309,15 @@ function initThreeJS() {
       heatSlices.forEach((slice) => {
         slice.visible = false;
       });
+      Object.values(sensorMarkers).forEach((marker) => {
+        marker.mesh.visible = false;
+      });
       return;
     }
+
+    Object.values(sensorMarkers).forEach((marker) => {
+      marker.mesh.visible = true;
+    });
 
     if (!roomState) {
       heatSlices.forEach((slice) => {
@@ -934,7 +1350,6 @@ function initThreeJS() {
     }
 
     if (roomState.restoreVisual) {
-      console.info(`Restoring volumetric visuals for ${REAL_ROOM_ID}`);
       roomState.dirty = true;
       roomState.restoreVisual = false;
     }
@@ -943,17 +1358,31 @@ function initThreeJS() {
   function animate() {
     requestAnimationFrame(animate);
     const now = Date.now();
+
     updateThermalVisuals(now);
     animateHeatSlices();
+
+    Object.keys(sensorMarkers).forEach((key, idx) => {
+      const marker = sensorMarkers[key];
+      const baseY = marker.mesh.userData.baseY;
+      marker.mesh.position.y = baseY + Math.sin(now * 0.0018 + idx) * 0.015;
+    });
+
     controls.update();
     renderer.render(scene, camera);
+    labelRenderer.render(scene, camera);
   }
 
   animate();
+  updateSensorVisuals(latestSensorState);
+
+  return {
+    updateSensorVisuals,
+  };
 }
 
 /* =====================================================================
- * 4. Notification Banner for Extreme Heat Index
+ * Notification Banner for Extreme Heat Index
  * ===================================================================== */
 
 let isAlertBannerVisible = false;
@@ -1009,7 +1438,7 @@ document.addEventListener("keydown", (e) => {
 });
 
 /* =====================================================================
- * 5. Notification Banner for Peak Heat Hours
+ * Peak Heat Hours
  * ===================================================================== */
 
 let isPeakBannerVisible = false;
@@ -1067,7 +1496,7 @@ document.addEventListener("keydown", (e) => {
 });
 
 /* =====================================================================
- * 6. Dashboard updating
+ * Dashboard updating
  * ===================================================================== */
 
 function updateConditionBanner(hi) {
@@ -1120,19 +1549,18 @@ function updateDashboard(
   label,
   advisory,
   monitoringStatus = "Based on 4 sensor positions",
+  roomData = null,
 ) {
   hi = Number(hi) || 0;
   label = label || "UNKNOWN";
 
   if (Array.isArray(advisory)) {
-    // keep as-is
   } else if (typeof advisory === "string") {
     advisory = [advisory];
   } else {
     advisory = ["No advisory available"];
   }
 
-  // Cache the dashboard state for quick display when switching rooms
   lastDashboardState = {
     temp,
     humidity,
@@ -1140,11 +1568,16 @@ function updateDashboard(
     label,
     advisory,
     monitoringStatus,
+    roomData,
   };
 
-  document.getElementById("temp-val").textContent = temp.toFixed(1);
-  document.getElementById("hum-val").textContent = humidity.toFixed(1);
-  document.getElementById("hi-val").textContent = hi.toFixed(1);
+  const tempEl = document.getElementById("temp-val");
+  const humEl = document.getElementById("hum-val");
+  const hiEl = document.getElementById("hi-val");
+
+  if (tempEl) tempEl.textContent = Number(temp).toFixed(1);
+  if (humEl) humEl.textContent = Number(humidity).toFixed(1);
+  if (hiEl) hiEl.textContent = Number(hi).toFixed(1);
 
   updateConditionBanner(hi);
 
@@ -1181,33 +1614,56 @@ function updateDashboard(
       break;
   }
 
-  document.getElementById("dss-title").innerHTML =
-    `Heat Index Advisory (Decision Support System): <span style="color:${color}; font-size:1.5em; font-weight:bold;">${label}</span>`;
+  const dssTitle = document.getElementById("dss-title");
+  if (dssTitle) {
+    dssTitle.innerHTML =
+      `Heat Index Advisory (Decision Support System): <span style="color:${color}; font-size:1.15em; font-weight:bold;">${label}</span>`;
+  }
 
   const dssBox = document.getElementById("dss-content");
-  dssBox.replaceChildren(
-    ...advisory.map((line) => {
-      const p = document.createElement("p");
-      p.textContent = String(line);
-      return p;
-    }),
-  );
+  if (dssBox) {
+    dssBox.replaceChildren(
+      ...advisory.map((line) => {
+        const p = document.createElement("p");
+        p.textContent = String(line);
+        return p;
+      }),
+    );
+  }
 
   const dssSourceLeft = document.getElementById("dss-source-left");
   const dssSourceRight = document.getElementById("dss-source-right");
   if (dssSourceLeft) {
-    dssSourceLeft.textContent = "Based on CDRRMO Heat Index Threshold Guidelines";
+    dssSourceLeft.textContent =
+      "Based on CDRRMO Heat Index Threshold Guidelines";
   }
   if (dssSourceRight) {
     dssSourceRight.textContent = monitoringStatus;
   }
+
+  if (roomData) {
+    setSensorStateFromRoomData(roomData);
+  } else {
+    setSensorStateFromRoomData({
+      averageTemperature: temp,
+      averageHumidity: humidity,
+      heatIndex: hi,
+      label,
+      advisory,
+    });
+  }
 }
 
 /* =====================================================================
- * 7. Line Chart Setup
+ * Charts
  * ===================================================================== */
 
 let sensorChart = null;
+let metricSparklines = {
+  temp: null,
+  hum: null,
+  hi: null,
+};
 let chartData = {
   labels: [],
   temp: [],
@@ -1215,10 +1671,14 @@ let chartData = {
   hi: [],
 };
 
-
-
 function initSparkline() {
-  const ctx = document.getElementById("sensorChart").getContext("2d");
+  const sensorCanvas = document.getElementById("sensorChart");
+  if (!sensorCanvas) {
+    sensorChart = null;
+    return;
+  }
+
+  const ctx = sensorCanvas.getContext("2d");
   sensorChart = new Chart(ctx, {
     type: "line",
     data: {
@@ -1229,6 +1689,7 @@ function initSparkline() {
           data: chartData.temp,
           borderColor: "rgba(255,0,0,0.8)",
           backgroundColor: "rgba(255,0,0,0.2)",
+          borderWidth: 4,
           tension: 0.4,
           fill: false,
           pointRadius: 5,
@@ -1238,6 +1699,7 @@ function initSparkline() {
           data: chartData.hum,
           borderColor: "rgba(0,0,255,0.8)",
           backgroundColor: "rgba(0,0,255,0.2)",
+          borderWidth: 4,
           tension: 0.4,
           fill: false,
           pointRadius: 5,
@@ -1247,6 +1709,7 @@ function initSparkline() {
           data: chartData.hi,
           borderColor: "rgba(255,165,0,0.8)",
           backgroundColor: "rgba(255,165,0,0.2)",
+          borderWidth: 4,
           tension: 0.4,
           fill: false,
           pointRadius: 5,
@@ -1256,44 +1719,68 @@ function initSparkline() {
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      interaction: {
-        mode: 'index',
-        intersect: false,
-      },
+    },
+  });
+}
+
+function createMetricSparkline(canvasId, dataSource, lineColor, fillColor) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return null;
+
+  const ctx = canvas.getContext("2d");
+
+  return new Chart(ctx, {
+    type: "line",
+    data: {
+      labels: chartData.labels,
+      datasets: [
+        {
+          data: dataSource,
+          borderColor: lineColor,
+          backgroundColor: fillColor,
+          borderWidth: 2,
+          tension: 0.42,
+          fill: true,
+          pointRadius: 2,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
       plugins: {
-        legend: {
-          display: true,
-          position: "top",
-        },
-        tooltip: {
-          enabled: true,
-          backgroundColor: 'rgba(0,0,0,0.8)',
-          titleColor: '#fff',
-          bodyColor: '#fff',
-          borderColor: '#fff',
-          borderWidth: 1,
-          cornerRadius: 8,
-          displayColors: true,
-          callbacks: {
-            title: function(context) {
-              return `Time: ${context[0].label}`;
-            },
-            label: function(context) {
-              return `${context.dataset.label}: ${context.parsed.y}`;
-            }
-          }
-        },
+        legend: { display: false },
+        tooltip: { enabled: false },
       },
       scales: {
-        x: { display: true },
-        y: { beginAtZero: true },
-      },
-      animation: {
-        duration: 1000,
-        easing: 'easeInOutQuart',
+        x: { display: false },
+        y: { display: false },
       },
     },
   });
+}
+
+function initMetricSparklines() {
+  metricSparklines.temp = createMetricSparkline(
+    "temp-sparkline",
+    chartData.temp,
+    "rgba(255, 77, 79, 0.95)",
+    "rgba(255, 77, 79, 0.18)",
+  );
+
+  metricSparklines.hum = createMetricSparkline(
+    "hum-sparkline",
+    chartData.hum,
+    "rgba(64, 158, 255, 0.95)",
+    "rgba(64, 158, 255, 0.16)",
+  );
+
+  metricSparklines.hi = createMetricSparkline(
+    "hi-sparkline",
+    chartData.hi,
+    "rgba(255, 170, 66, 0.95)",
+    "rgba(255, 170, 66, 0.16)",
+  );
 }
 
 function updateSparkline(temp, hum, hi) {
@@ -1311,15 +1798,15 @@ function updateSparkline(temp, hum, hi) {
   }
 
   if (sensorChart) sensorChart.update();
+  if (metricSparklines.temp) metricSparklines.temp.update();
+  if (metricSparklines.hum) metricSparklines.hum.update();
+  if (metricSparklines.hi) metricSparklines.hi.update();
 }
 
 /* =====================================================================
- * 8. Backend listener with WiFi resilience
+ * Backend listener
  * ===================================================================== */
 
-/**
- * Fetch with timeout and retry logic for weak WiFi
- */
 async function fetchWithTimeout(url, timeoutMs = FETCH_TIMEOUT_MS) {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
@@ -1337,9 +1824,6 @@ async function fetchWithTimeout(url, timeoutMs = FETCH_TIMEOUT_MS) {
   }
 }
 
-/**
- * Save last successful data to localStorage for offline use
- */
 function cacheSuccessfulData(data) {
   try {
     localStorage.setItem(
@@ -1347,7 +1831,7 @@ function cacheSuccessfulData(data) {
       JSON.stringify({
         data,
         timestamp: Date.now(),
-      })
+      }),
     );
     lastSuccessfulData = data;
   } catch (err) {
@@ -1355,16 +1839,13 @@ function cacheSuccessfulData(data) {
   }
 }
 
-/**
- * Retrieve cached data from localStorage
- */
 function getCachedData() {
   try {
     const cached = localStorage.getItem("lastRoomData");
     if (cached) {
       const parsed = JSON.parse(cached);
       const cacheAge = Date.now() - parsed.timestamp;
-      const MAX_CACHE_AGE = 5 * 60 * 1000; // 5 minutes
+      const MAX_CACHE_AGE = 5 * 60 * 1000;
 
       if (cacheAge < MAX_CACHE_AGE) {
         return parsed.data;
@@ -1376,14 +1857,11 @@ function getCachedData() {
   return lastSuccessfulData;
 }
 
-/**
- * Attempt to fetch data with retry logic
- */
 async function fetchDataWithRetry(roomId, retryCount = 0) {
   try {
     const res = await fetchWithTimeout(
       `${BACKEND_URL}/api/${roomId}`,
-      FETCH_TIMEOUT_MS
+      FETCH_TIMEOUT_MS,
     );
 
     if (!res.ok) {
@@ -1394,7 +1872,6 @@ async function fetchDataWithRetry(roomId, retryCount = 0) {
     const roomData = json[roomId];
     if (!roomData) throw new Error("Invalid room data");
 
-    // Validate data
     const temp = Number(roomData.averageTemperature);
     const hum = Number(roomData.averageHumidity);
     const hi = Number(roomData.heatIndex);
@@ -1403,7 +1880,6 @@ async function fetchDataWithRetry(roomId, retryCount = 0) {
       throw new Error("Invalid numeric values");
     }
 
-    // Success - reset failure counter
     consecutiveFailures = 0;
     connectionQuality = "good";
     cacheSuccessfulData(roomData);
@@ -1411,12 +1887,11 @@ async function fetchDataWithRetry(roomId, retryCount = 0) {
   } catch (error) {
     console.warn(
       `Fetch attempt ${retryCount + 1}/${MAX_RETRIES} failed:`,
-      error.message
+      error.message,
     );
 
-    // Retry with exponential backoff
     if (retryCount < MAX_RETRIES) {
-      const backoffMs = Math.pow(2, retryCount) * 1000; // 1s, 2s, 4s
+      const backoffMs = Math.pow(2, retryCount) * 1000;
       await new Promise((resolve) => setTimeout(resolve, backoffMs));
       return fetchDataWithRetry(roomId, retryCount + 1);
     }
@@ -1447,7 +1922,15 @@ async function listenToData() {
       const monitoringStatus =
         roomData.monitoringStatus || "Based on 4 sensor positions";
 
-      updateDashboard(temp, hum, hi, roomData.label, roomData.advisory, monitoringStatus);
+      updateDashboard(
+        temp,
+        hum,
+        hi,
+        roomData.label,
+        roomData.advisory,
+        monitoringStatus,
+        roomData,
+      );
       updateSparkline(temp, hum, hi);
 
       latestAIContext = {
@@ -1472,33 +1955,39 @@ async function listenToData() {
     } catch (err) {
       consecutiveFailures++;
       connectionQuality =
-        consecutiveFailures > 2 ? "poor" : consecutiveFailures > 1 ? "fair" : "good";
+        consecutiveFailures > 2
+          ? "poor"
+          : consecutiveFailures > 1
+            ? "fair"
+            : "good";
 
       if (!backendDown) {
         console.warn(
           `Backend error (attempt ${consecutiveFailures}):`,
-          err.message
+          err.message,
         );
         backendDown = true;
       }
 
-      // Try to use cached data
-      let cachedData = getCachedData();
+      const cachedData = getCachedData();
 
-      let temp, hum, fallbackHI, label, advisory;
+      let temp, hum, fallbackHI, label, advisory, fallbackRoomData;
 
       if (cachedData) {
-        // Use cached data
-        temp = cachedData.averageTemperature;
-        hum = cachedData.averageHumidity;
-        fallbackHI = cachedData.heatIndex;
+        temp = Number(cachedData.averageTemperature);
+        hum = Number(cachedData.averageHumidity);
+        fallbackHI = Number(cachedData.heatIndex);
         label = `${cachedData.label} (CACHED)`;
         advisory = [
-          ...cachedData.advisory,
+          ...toAdvisoryArray(cachedData.advisory),
           "Using cached data due to connection issues.",
         ];
+        fallbackRoomData = {
+          ...cachedData,
+          label,
+          advisory,
+        };
       } else {
-        // Fall back to latest context or defaults
         temp = latestAIContext.temperature || 30;
         hum = latestAIContext.humidity || 60;
         fallbackHI = computeFallbackHeatIndex(temp, hum);
@@ -1508,6 +1997,13 @@ async function listenToData() {
           "Using local heat index estimation.",
           "Check your WiFi connection.",
         ];
+        fallbackRoomData = {
+          averageTemperature: temp,
+          averageHumidity: hum,
+          heatIndex: fallbackHI,
+          label,
+          advisory,
+        };
       }
 
       updateDashboard(
@@ -1516,7 +2012,8 @@ async function listenToData() {
         fallbackHI,
         label,
         advisory,
-        `Fallback mode (${connectionQuality} connection)`
+        `Fallback mode (${connectionQuality} connection)`,
+        fallbackRoomData,
       );
 
       updateSparkline(temp, hum, fallbackHI);
@@ -1534,19 +2031,17 @@ async function listenToData() {
     }
   };
 
-  // Initial poll
   await poll();
 
-  // Adaptive polling interval based on connection quality
   const startPolling = () => {
     if (pollingIntervalId) clearInterval(pollingIntervalId);
 
-    let interval = 60000; // Default: 60 seconds
+    let interval = 60000;
 
     if (connectionQuality === "fair") {
-      interval = 90000; // Weak connection: 90 seconds
+      interval = 90000;
     } else if (connectionQuality === "poor") {
-      interval = 120000; // Poor connection: 120 seconds
+      interval = 120000;
     }
 
     pollingIntervalId = setInterval(poll, interval);
@@ -1554,7 +2049,6 @@ async function listenToData() {
 
   startPolling();
 
-  // Monitor online/offline status
   window.addEventListener("online", () => {
     console.log("Connection restored");
     connectionQuality = "good";
@@ -1570,7 +2064,7 @@ async function listenToData() {
 }
 
 /* =====================================================================
- * 9. Philippine Date & Time Display
+ * Philippine Date & Time Display
  * ===================================================================== */
 
 async function updatePhilippineDateTime() {
@@ -1638,7 +2132,7 @@ async function updatePhilippineDateTime() {
 }
 
 /* =====================================================================
- * 10. Export Historical Logs
+ * Export Historical Logs
  * ===================================================================== */
 
 async function exportHistoricalLogs() {
@@ -1685,11 +2179,12 @@ async function exportHistoricalLogs() {
 window.exportHistoricalLogs = exportHistoricalLogs;
 
 /* =====================================================================
- * 11. BOOT ALL SYSTEMS
+ * BOOT ALL SYSTEMS
  * ===================================================================== */
 
 window.onload = () => {
   updatePhilippineDateTime();
+  setActiveRoomBadge("room1");
 
   setInterval(() => {
     const now = new Date();
@@ -1719,11 +2214,13 @@ window.onload = () => {
   setupRoomClickHandlers();
   setupMenuClickHandlers();
   setupDarkModeToggle();
+  setupAssistantChatToggle();
 
   setInterval(checkPeakHeatHours, 60000);
 
-  initThreeJS();
+  threeApp = initThreeJS();
   initSparkline();
+  initMetricSparklines();
   listenToData();
   initAIChat();
 
@@ -1742,8 +2239,7 @@ window.onload = () => {
     heatmapToggle.addEventListener("change", (e) => {
       isHeatmapEnabled = e.target.checked;
       console.log("Heatmap enabled:", isHeatmapEnabled);
-      
-      // Immediately update heatmap visibility
+
       heatSlices.forEach((slice) => {
         slice.visible = isHeatmapEnabled;
       });

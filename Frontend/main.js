@@ -333,7 +333,7 @@ const SENSOR_KEYS = ["front", "back", "left", "right"];
 
 const defaultSensorState = {
   front: {
-    name: "Front Sensor",
+    name: "Front Node",
     temperature: null,
     humidity: null,
     heatIndex: null,
@@ -341,7 +341,7 @@ const defaultSensorState = {
     advisory: ["Waiting data..."],
   },
   back: {
-    name: "Back Sensor",
+    name: "Back Node",
     temperature: null,
     humidity: null,
     heatIndex: null,
@@ -349,7 +349,7 @@ const defaultSensorState = {
     advisory: ["Waiting data..."],
   },
   left: {
-    name: "Left Sensor",
+    name: "Left Node",
     temperature: null,
     humidity: null,
     heatIndex: null,
@@ -357,7 +357,7 @@ const defaultSensorState = {
     advisory: ["Waiting data..."],
   },
   right: {
-    name: "Right Sensor",
+    name: "Right Node",
     temperature: null,
     humidity: null,
     heatIndex: null,
@@ -499,6 +499,44 @@ function setSensorStateFromRoomData(roomData) {
   }
 }
 
+function updateFrontSensorFromRoomData(roomData) {
+  const currentFront = latestSensorState?.front || defaultSensorState.front;
+  const nodeFront = roomData?.nodeStatus?.front || null;
+
+  if (!nodeFront || !nodeFront.available) {
+    return;
+  }
+
+  const frontTemperature = Number(
+    nodeFront.temperature ?? nodeFront.temp ?? nodeFront.airTemperature,
+  );
+  const frontHumidity = Number(
+    nodeFront.humidity ?? nodeFront.rh ?? nodeFront.relativeHumidity,
+  );
+
+  const nextState = {
+    ...latestSensorState,
+    front: {
+      ...currentFront,
+      temperature: Number.isFinite(frontTemperature)
+        ? frontTemperature
+        : currentFront.temperature,
+      humidity: Number.isFinite(frontHumidity)
+        ? frontHumidity
+        : currentFront.humidity,
+      heatIndex: currentFront.heatIndex,
+      label: currentFront.label,
+      advisory: currentFront.advisory,
+    },
+  };
+
+  latestSensorState = nextState;
+
+  if (threeApp) {
+    threeApp.updateSensorVisuals(latestSensorState);
+  }
+}
+
 function updateLeftSensorFromRoomData(roomData) {
   const currentLeft = latestSensorState?.left || defaultSensorState.left;
   const nodeLeft = roomData?.nodeStatus?.left || null;
@@ -616,7 +654,7 @@ function updateRightSensorFromRoomData(roomData) {
 function setReservedSensorVisualState() {
   latestSensorState = {
     front: {
-      name: "Front Sensor",
+      name: "Front Node",
       temperature: null,
       humidity: null,
       heatIndex: null,
@@ -624,7 +662,7 @@ function setReservedSensorVisualState() {
       advisory: ["Room 2 is reserved for future expansion."],
     },
     back: {
-      name: "Back Sensor",
+      name: "Back Node",
       temperature: null,
       humidity: null,
       heatIndex: null,
@@ -632,7 +670,7 @@ function setReservedSensorVisualState() {
       advisory: ["Room 2 is reserved for future expansion."],
     },
     left: {
-      name: "Left Sensor",
+      name: "Left Node",
       temperature: null,
       humidity: null,
       heatIndex: null,
@@ -640,7 +678,7 @@ function setReservedSensorVisualState() {
       advisory: ["Room 2 is reserved for future expansion."],
     },
     right: {
-      name: "Right Sensor",
+      name: "Right Node",
       temperature: null,
       humidity: null,
       heatIndex: null,
@@ -817,7 +855,7 @@ function buildSensorLabelElement(sensorName) {
   primary.style.lineHeight = "1.1";
 
   const secondary = document.createElement("div");
-  secondary.textContent = "H --% · HI --°C";
+  secondary.textContent = "H --%";
   secondary.style.fontSize = "11px";
   secondary.style.fontWeight = "600";
   secondary.style.color = "#4d6788";
@@ -1213,7 +1251,7 @@ function initThreeJS() {
 
   function createSensorMarker(sensorKey) {
     const readable =
-      sensorKey.charAt(0).toUpperCase() + sensorKey.slice(1) + " Sensor";
+      sensorKey.charAt(0).toUpperCase() + sensorKey.slice(1) + " Node";
 
     const material = new THREE.MeshStandardMaterial({
       color: 0x3b82f6,
@@ -1270,7 +1308,7 @@ function initThreeJS() {
       marker.labelSecondary.textContent = `H ${formatMetricValue(
         state.humidity,
         "%",
-      )} · HI ${formatMetricValue(state.heatIndex, "°C")}`;
+      )}`;
 
       marker.labelObject.element.style.transform = "scale(1)";
       marker.labelObject.element.style.borderColor =
@@ -2331,7 +2369,8 @@ function listenToSideSensorsData() {
       const json = await res.json();
       const roomData = json[REAL_ROOM_ID];
       if (!roomData || !roomData.nodeStatus) return;
-
+      
+      updateFrontSensorFromRoomData(roomData);
       updateLeftSensorFromRoomData(roomData);
       updateBackSensorFromRoomData(roomData);
       updateRightSensorFromRoomData(roomData);

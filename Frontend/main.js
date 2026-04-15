@@ -828,7 +828,7 @@ function buildSensorLabelElement(sensorName) {
   el.style.display = "flex";
   el.style.flexDirection = "column";
   el.style.gap = "4px";
-  el.style.minWidth = "130px";
+  el.style.minWidth = "1px";
   el.style.padding = "8px 10px";
   el.style.borderRadius = "12px";
   el.style.background = "rgba(255,255,255,0.92)";

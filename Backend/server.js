@@ -109,6 +109,44 @@ function buildMonitoringStatusMessage(availableNodes, totalNodes) {
 }
 
 /**
+ * Ensure monitoring status is always available at roomData.monitoring.Status
+ * while keeping legacy roomData.monitoringStatus in sync.
+ */
+function normalizeMonitoringStatus(roomData) {
+  if (!roomData || typeof roomData !== "object") {
+    return roomData;
+  }
+
+  let status =
+    roomData?.monitoring?.Status ||
+    roomData?.monitoringStatus ||
+    "";
+
+  if (
+    (typeof status !== "string" || !status.trim()) &&
+    Number.isFinite(roomData.availableNodes) &&
+    Number.isFinite(roomData.totalNodes)
+  ) {
+    status = buildMonitoringStatusMessage(
+      roomData.availableNodes,
+      roomData.totalNodes
+    );
+  }
+
+  if (typeof status !== "string" || !status.trim()) {
+    status = "Based on 4 sensor positions";
+  }
+
+  roomData.monitoring = {
+    ...(roomData.monitoring || {}),
+    Status: status,
+  };
+  roomData.monitoringStatus = status;
+
+  return roomData;
+}
+
+/**
  * Extract thermal frame and compute min/max
  */
 function processThermalData(docData) {
@@ -236,6 +274,11 @@ async function getRoomSensorData(roomName) {
     const label = getHeatIndexLabel(computedHeatIndex);
     const advisory = getHeatIndexAdvisory(computedHeatIndex);
 
+    const monitoringStatus = buildMonitoringStatusMessage(
+      availableNodes,
+      TOTAL_ROOM1_NODES
+    );
+
     return {
       averageTemperature: roundedTemperature,
       averageHumidity: roundedHumidity,
@@ -246,10 +289,10 @@ async function getRoomSensorData(roomName) {
         : advisory
           ? [advisory]
           : ["No advisory available"],
-      monitoringStatus: buildMonitoringStatusMessage(
-        availableNodes,
-        TOTAL_ROOM1_NODES
-      ),
+      monitoringStatus,
+      monitoring: {
+        Status: monitoringStatus,
+      },
       availableNodes,
       totalNodes: TOTAL_ROOM1_NODES,
       nodeStatus,
@@ -310,7 +353,7 @@ async function refreshRoomCache(roomName) {
   try {
     const roomData = await buildRoomResponse(roomName);
     if (roomData) {
-      roomResponseCache[roomName] = roomData;
+      roomResponseCache[roomName] = normalizeMonitoringStatus(roomData);
     }
   } catch (error) {
     console.error(`Error refreshing cache for ${roomName}:`, error);
@@ -419,6 +462,8 @@ app.get("/api/:roomName", async (req, res) => {
         error: `No data found for room: ${roomName}`,
       });
     }
+
+    normalizeMonitoringStatus(roomData);
 
     return res.json({
       [roomName]: roomData,

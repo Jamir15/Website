@@ -680,7 +680,7 @@ function showReservedRoom2View() {
   );
 
   const sourceLeft = document.getElementById("dss-source-left");
-  const sourceRight = document.getElementById("dss-source-right");
+  const sourceRight = document.getElementById("viewer-monitoring-status");
   if (sourceLeft) sourceLeft.textContent = "";
   if (sourceRight) {
     sourceRight.textContent = "Scalable multi-room dashboard architecture";
@@ -722,7 +722,7 @@ function setupRoomClickHandlers() {
           `<p>Loading live data for <b>${activeRoom.toUpperCase()}</b>...</p>`;
 
         const sourceLeft = document.getElementById("dss-source-left");
-        const sourceRight = document.getElementById("dss-source-right");
+        const sourceRight = document.getElementById("viewer-monitoring-status");
         if (sourceLeft) {
           sourceLeft.textContent =
             "Based on CDRRMO Heat Index Threshold Guidelines";
@@ -1880,7 +1880,7 @@ function updateDashboard(
   }
 
   const dssSourceLeft = document.getElementById("dss-source-left");
-  const dssSourceRight = document.getElementById("dss-source-right");
+  const dssSourceRight = document.getElementById("viewer-monitoring-status");
   if (dssSourceLeft) {
     dssSourceLeft.textContent =
       "Based on CDRRMO Heat Index Threshold Guidelines";

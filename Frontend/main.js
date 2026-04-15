@@ -382,22 +382,11 @@ function toAdvisoryArray(advisory) {
   return ["No advisory available."];
 }
 
-function setSensorStateFromRoomData(roomData) {
-  const avgTemp = Number(roomData.averageTemperature);
-  const avgHum = Number(roomData.averageHumidity);
-  const avgHi = Number(roomData.heatIndex);
+function readSensorCandidateFromRoomData(roomData, sensorKey, fallbackState = null) {
+  if (!roomData || typeof roomData !== "object") return null;
+
   const avgLabel = roomData.label || "Waiting Data";
   const avgAdvisory = toAdvisoryArray(roomData.advisory);
-
-  const nextState = JSON.parse(JSON.stringify(defaultSensorState));
-
-  SENSOR_KEYS.forEach((key) => {
-    nextState[key].temperature = Number.isFinite(avgTemp) ? avgTemp : null;
-    nextState[key].humidity = Number.isFinite(avgHum) ? avgHum : null;
-    nextState[key].heatIndex = Number.isFinite(avgHi) ? avgHi : null;
-    nextState[key].label = avgLabel;
-    nextState[key].advisory = avgAdvisory;
-  });
 
   const candidateContainers = [
     roomData.sensorNodes,
@@ -406,6 +395,7 @@ function setSensorStateFromRoomData(roomData) {
     roomData.positions,
     roomData.positionData,
     roomData.nodeData,
+    roomData.nodeStatus,
   ].filter(Boolean);
 
   const readCandidate = (candidate) => {
@@ -448,28 +438,125 @@ function setSensorStateFromRoomData(roomData) {
   };
 
   for (const container of candidateContainers) {
-    SENSOR_KEYS.forEach((key) => {
-      const direct = container[key];
-      const alt =
-        container[key.toUpperCase()] ||
-        container[`${key}Node`] ||
-        container[`${key}_node`] ||
-        container[`${key}Sensor`] ||
-        container[`${key}_sensor`];
+    const direct = container[sensorKey];
+    const alt =
+      container[sensorKey.toUpperCase()] ||
+      container[`${sensorKey}Node`] ||
+      container[`${sensorKey}_node`] ||
+      container[`${sensorKey}Sensor`] ||
+      container[`${sensorKey}_sensor`];
 
-      const found = readCandidate(direct || alt);
-      if (!found) return;
-
-      if (Number.isFinite(found.temperature))
-        nextState[key].temperature = found.temperature;
-      if (Number.isFinite(found.humidity))
-        nextState[key].humidity = found.humidity;
-      if (Number.isFinite(found.heatIndex))
-        nextState[key].heatIndex = found.heatIndex;
-      nextState[key].label = found.label;
-      nextState[key].advisory = found.advisory;
-    });
+    const found = readCandidate(direct || alt);
+    if (found) return found;
   }
+
+  if (fallbackState) {
+    return {
+      temperature: Number(fallbackState.temperature),
+      humidity: Number(fallbackState.humidity),
+      heatIndex: Number(fallbackState.heatIndex),
+      label: fallbackState.label || avgLabel,
+      advisory: toAdvisoryArray(fallbackState.advisory || avgAdvisory),
+    };
+  }
+
+  return null;
+}
+
+function setSensorStateFromRoomData(roomData) {
+  const avgTemp = Number(roomData.averageTemperature);
+  const avgHum = Number(roomData.averageHumidity);
+  const avgHi = Number(roomData.heatIndex);
+  const avgLabel = roomData.label || "Waiting Data";
+  const avgAdvisory = toAdvisoryArray(roomData.advisory);
+
+  const nextState = JSON.parse(JSON.stringify(defaultSensorState));
+
+  SENSOR_KEYS.forEach((key) => {
+    nextState[key].temperature = Number.isFinite(avgTemp) ? avgTemp : null;
+    nextState[key].humidity = Number.isFinite(avgHum) ? avgHum : null;
+    nextState[key].heatIndex = Number.isFinite(avgHi) ? avgHi : null;
+    nextState[key].label = avgLabel;
+    nextState[key].advisory = avgAdvisory;
+  });
+
+  SENSOR_KEYS.forEach((key) => {
+    const found = readSensorCandidateFromRoomData(roomData, key, nextState[key]);
+    if (!found) return;
+
+    if (Number.isFinite(found.temperature))
+      nextState[key].temperature = found.temperature;
+    if (Number.isFinite(found.humidity)) nextState[key].humidity = found.humidity;
+    if (Number.isFinite(found.heatIndex)) nextState[key].heatIndex = found.heatIndex;
+    nextState[key].label = found.label;
+    nextState[key].advisory = found.advisory;
+  });
+
+  latestSensorState = nextState;
+
+  if (threeApp) {
+    threeApp.updateSensorVisuals(latestSensorState);
+  }
+}
+
+function updateLeftSensorFromRoomData(roomData) {
+  const currentLeft = latestSensorState?.left || defaultSensorState.left;
+  const nodeLeft = roomData?.nodeStatus?.left || null;
+
+  if (!nodeLeft || !nodeLeft.available) {
+    return;
+  }
+
+  const nextState = {
+    ...latestSensorState,
+    left: {
+      ...currentLeft,
+      temperature:
+        typeof nodeLeft.temperature === "number"
+          ? Number(nodeLeft.temperature)
+          : currentLeft.temperature,
+      humidity:
+        typeof nodeLeft.humidity === "number"
+          ? Number(nodeLeft.humidity)
+          : currentLeft.humidity,
+      heatIndex: currentLeft.heatIndex,
+      label: currentLeft.label,
+      advisory: currentLeft.advisory,
+    },
+  };
+
+  latestSensorState = nextState;
+
+  if (threeApp) {
+    threeApp.updateSensorVisuals(latestSensorState);
+  }
+}
+
+function updateRightSensorFromRoomData(roomData) {
+  const currentRight = latestSensorState?.right || defaultSensorState.right;
+  const nodeRight = roomData?.nodeStatus?.right || null;
+
+  if (!nodeRight || !nodeRight.available) {
+    return;
+  }
+
+  const nextState = {
+    ...latestSensorState,
+    right: {
+      ...currentRight,
+      temperature:
+        typeof nodeRight.temperature === "number"
+          ? Number(nodeRight.temperature)
+          : currentRight.temperature,
+      humidity:
+        typeof nodeRight.humidity === "number"
+          ? Number(nodeRight.humidity)
+          : currentRight.humidity,
+      heatIndex: currentRight.heatIndex,
+      label: currentRight.label,
+      advisory: currentRight.advisory,
+    },
+  };
 
   latestSensorState = nextState;
 
@@ -1555,6 +1642,7 @@ function updateDashboard(
   label = label || "UNKNOWN";
 
   if (Array.isArray(advisory)) {
+    // keep as-is
   } else if (typeof advisory === "string") {
     advisory = [advisory];
   } else {
@@ -2063,6 +2151,40 @@ async function listenToData() {
   });
 }
 
+function listenToSideSensorsData() {
+  let isFetchingSideSensors = false;
+
+  const pollSideSensors = async () => {
+    if (activeRoom !== REAL_ROOM_ID || isFetchingSideSensors) {
+      return;
+    }
+
+    try {
+      isFetchingSideSensors = true;
+      const res = await fetchWithTimeout(
+        `${BACKEND_URL}/api/${REAL_ROOM_ID}`,
+        5000,
+      );
+
+      if (!res.ok) return;
+
+      const json = await res.json();
+      const roomData = json[REAL_ROOM_ID];
+      if (!roomData || !roomData.nodeStatus) return;
+
+      updateLeftSensorFromRoomData(roomData);
+      updateRightSensorFromRoomData(roomData);
+    } catch (err) {
+      // Keep side-sensor updater silent to avoid noisy logs every 2 seconds.
+    } finally {
+      isFetchingSideSensors = false;
+    }
+  };
+
+  pollSideSensors();
+  setInterval(pollSideSensors, 2000);
+}
+
 /* =====================================================================
  * Philippine Date & Time Display
  * ===================================================================== */
@@ -2222,6 +2344,7 @@ window.onload = () => {
   initSparkline();
   initMetricSparklines();
   listenToData();
+  listenToSideSensorsData();
   initAIChat();
 
   listenToThermal(REAL_ROOM_ID);

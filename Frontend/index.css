@@ -391,7 +391,7 @@ body.assistant-chat-open .layout-grid {
     position: absolute;
     top: 1rem;
     left: 1rem;
-    right: 1rem;
+    right: 24rem;
     z-index: 20;
     display: flex;
     align-items: flex-start;
@@ -495,7 +495,7 @@ canvas {
     z-index: 30;
     display: flex;
     flex-direction: column;
-    gap: 1rem;
+    gap: 0.75rem;
     pointer-events: none;
 }
 
@@ -504,10 +504,10 @@ canvas {
     border: 1px solid rgba(201,217,238,0.95);
     border-radius: 18px;
     box-shadow: 0 14px 36px rgba(16, 34, 58, 0.12);
-    padding: 1rem;
+    padding: 0.85rem;
     display: flex;
     flex-direction: column;
-    gap: 0.9rem;
+    gap: 0.75rem;
     backdrop-filter: blur(14px);
     pointer-events: auto;
 }
@@ -516,23 +516,28 @@ canvas {
     flex: 0 0 auto;
 }
 
+.middle-blank-card {
+    flex: 0 0 110px;
+    min-height: 110px;
+}
+
 .selected-sensor-card {
     flex: 0 0 auto;
 }
 
 .dss-modern-card {
-    flex: 1 1 auto;
+    flex: 1 1 0;
     min-height: 0;
 }
 
 .details-card-header {
     display: flex;
     flex-direction: column;
-    gap: 0.2rem;
+    gap: 0.18rem;
 }
 
 .details-kicker {
-    font-size: 0.74rem;
+    font-size: 0.7rem;
     font-weight: 700;
     letter-spacing: 0.08em;
     text-transform: uppercase;
@@ -540,7 +545,7 @@ canvas {
 }
 
 .details-card-title {
-    font-size: 1.05rem;
+    font-size: 0.98rem;
     font-weight: 700;
     color: #102845;
     line-height: 1.2;
@@ -549,14 +554,14 @@ canvas {
 .summary-metrics {
     display: grid;
     grid-template-columns: 1fr;
-    gap: 0.75rem;
+    gap: 0.55rem;
 }
 
 .summary-metric {
     border-radius: 14px;
     border: 1px solid rgba(201,217,238,0.95);
     background: rgba(255,255,255,0.72);
-    padding: 0.9rem 1rem;
+    padding: 0.72rem 0.85rem;
     transition: transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease;
 }
 
@@ -567,23 +572,46 @@ canvas {
 }
 
 .summary-label {
-    font-size: 0.78rem;
+    font-size: 0.72rem;
     color: #5b789f;
     font-weight: 700;
     letter-spacing: 0.04em;
     text-transform: uppercase;
-    margin-bottom: 0.3rem;
+    margin-bottom: 0.22rem;
 }
 
 .summary-value {
-    font-size: 1.4rem;
+    font-size: 1.18rem;
     font-weight: 700;
     color: var(--accent-color);
-    line-height: 1.15;
+    line-height: 1.12;
+}
+
+/* -------------------------------------------------
+   ROOM SUMMARY COLOR CODING
+-------------------------------------------------- */
+.summary-value.normal {
+    color: #2e9d5b;
+}
+
+.summary-value.caution {
+    color: #f1c40f;
+}
+
+.summary-value.extreme-caution {
+    color: #ff8c00;
+}
+
+.summary-value.danger {
+    color: #ff8fa3;
+}
+
+.summary-value.extreme-danger {
+    color: #dc2626;
 }
 
 .summary-value .unit {
-    font-size: 0.9rem;
+    font-size: 0.82rem;
     font-weight: 600;
     color: #55739b;
 }
@@ -664,44 +692,44 @@ canvas {
 
 #dss-card h3,
 #dss-title {
-    font-size: 1rem;
+    font-size: 0.94rem;
     margin: 0;
     text-align: left;
-    line-height: 1.35;
+    line-height: 1.3;
     color: #102845;
 }
 
 #dss-content {
     white-space: pre-line !important;
-    font-size: 0.9rem;
-    line-height: 1.45;
+    font-size: 0.84rem;
+    line-height: 1.4;
     overflow-y: auto !important;
     word-break: break-word;
     flex: 1;
     min-height: 0;
-    padding-right: 0.2rem;
+    padding-right: 0.15rem;
 }
 
 #dss-content p {
-    font-size: 0.9rem;
+    font-size: 0.84rem;
     display: block !important;
     white-space: normal !important;
     overflow: visible !important;
     text-overflow: unset !important;
-    margin: 4px 0;
+    margin: 3px 0;
     word-break: break-word;
 }
 
 #dss-sources {
     display: flex;
     justify-content: space-between;
-    gap: 1rem;
+    gap: 0.75rem;
     margin-top: auto;
-    font-size: 0.72rem;
+    font-size: 0.68rem;
     color: #5d728f;
     opacity: 0.95;
     border-top: 1px solid rgba(201, 217, 238, 0.85);
-    padding-top: 0.8rem;
+    padding-top: 0.65rem;
 }
 
 #dss-source-left,
@@ -1438,6 +1466,26 @@ body.dark-mode #dss-title {
 
 body.dark-mode .summary-value {
     color: #aecdff;
+}
+
+body.dark-mode .summary-value.normal {
+    color: #4ade80;
+}
+
+body.dark-mode .summary-value.caution {
+    color: #fde047;
+}
+
+body.dark-mode .summary-value.extreme-caution {
+    color: #fb923c;
+}
+
+body.dark-mode .summary-value.danger {
+    color: #fda4af;
+}
+
+body.dark-mode .summary-value.extreme-danger {
+    color: #f87171;
 }
 
 body.dark-mode .summary-value .unit {

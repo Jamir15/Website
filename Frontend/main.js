@@ -537,6 +537,44 @@ function updateLeftSensorFromRoomData(roomData) {
   }
 }
 
+function updateBackSensorFromRoomData(roomData) {
+  const currentBack = latestSensorState?.back || defaultSensorState.back;
+  const nodeBack = roomData?.nodeStatus?.back || null;
+
+  if (!nodeBack || !nodeBack.available) {
+    return;
+  }
+
+  const backTemperature = Number(
+    nodeBack.temperature ?? nodeBack.temp ?? nodeBack.airTemperature,
+  );
+  const backHumidity = Number(
+    nodeBack.humidity ?? nodeBack.rh ?? nodeBack.relativeHumidity,
+  );
+
+  const nextState = {
+    ...latestSensorState,
+    back: {
+      ...currentBack,
+      temperature: Number.isFinite(backTemperature)
+        ? backTemperature
+        : currentBack.temperature,
+      humidity: Number.isFinite(backHumidity)
+        ? backHumidity
+        : currentBack.humidity,
+      heatIndex: currentBack.heatIndex,
+      label: currentBack.label,
+      advisory: currentBack.advisory,
+    },
+  };
+
+  latestSensorState = nextState;
+
+  if (threeApp) {
+    threeApp.updateSensorVisuals(latestSensorState);
+  }
+}
+
 function updateRightSensorFromRoomData(roomData) {
   const currentRight = latestSensorState?.right || defaultSensorState.right;
   const nodeRight = roomData?.nodeStatus?.right || null;
@@ -852,9 +890,12 @@ function initThreeJS() {
 
   let heatmapTexture = null;
   const heatmapCanvas = document.createElement("canvas");
-  heatmapCanvas.width = 32;
-  heatmapCanvas.height = 24;
+  const HEATMAP_WIDTH = 128;
+  const HEATMAP_HEIGHT = 96;
+  heatmapCanvas.width = HEATMAP_WIDTH;
+  heatmapCanvas.height = HEATMAP_HEIGHT;
   const heatmapCtx = heatmapCanvas.getContext("2d");
+  heatmapCtx.imageSmoothingEnabled = false;
 
   function colorMapFLIR(value, minValue, maxValue) {
     let t = (value - minValue) / (maxValue - minValue);
@@ -929,7 +970,7 @@ function initThreeJS() {
     }
 
     heatmapCtx.putImageData(imageData, 0, 0);
-    heatmapCtx.imageSmoothingEnabled = true;
+    heatmapCtx.imageSmoothingEnabled = false;
     heatmapTexture.needsUpdate = true;
 
     const now = Date.now();
@@ -951,6 +992,104 @@ function initThreeJS() {
     });
   }
 
+  function updateHeatFromRoomSensors(sensorState) {
+    if (!sensorState) return false;
+
+    const frontTemp = Number(sensorState.front?.temperature);
+    const backTemp = Number(sensorState.back?.temperature);
+    const leftTemp = Number(sensorState.left?.temperature);
+    const rightTemp = Number(sensorState.right?.temperature);
+
+    const hasAllSensorTemps =
+      Number.isFinite(frontTemp) &&
+      Number.isFinite(backTemp) &&
+      Number.isFinite(leftTemp) &&
+      Number.isFinite(rightTemp);
+
+    if (!hasAllSensorTemps) return false;
+
+    const minT = Math.min(frontTemp, backTemp, leftTemp, rightTemp);
+    const maxT = Math.max(frontTemp, backTemp, leftTemp, rightTemp);
+    const sensorRange = maxT - minT;
+    const displayRange = Math.max(sensorRange, 0.4);
+    const displayMid = (minT + maxT) / 2;
+    const displayMin = displayMid - displayRange / 2;
+    const displayMax = displayMid + displayRange / 2;
+
+    const width = HEATMAP_WIDTH;
+    const height = HEATMAP_HEIGHT;
+    const imageData = heatmapCtx.createImageData(width, height);
+    const data = imageData.data;
+
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const nx = x / (width - 1);
+        const ny = y / (height - 1);
+
+        // Strong four-zone partition:
+        // each sensor dominates its side of the room (front/back/left/right),
+        // with only a thin blend line where zones meet.
+        const rawFront = 1 - ny;
+        const rawBack = ny;
+        const rawLeft = 1 - nx;
+        const rawRight = nx;
+
+        const PARTITION_SHARPNESS = 10;
+        const frontWeight = Math.pow(rawFront, PARTITION_SHARPNESS);
+        const backWeight = Math.pow(rawBack, PARTITION_SHARPNESS);
+        const leftWeight = Math.pow(rawLeft, PARTITION_SHARPNESS);
+        const rightWeight = Math.pow(rawRight, PARTITION_SHARPNESS);
+
+        const weightSum =
+          frontWeight + backWeight + leftWeight + rightWeight;
+
+        const interpolatedTemp =
+          (
+            frontTemp * frontWeight +
+            backTemp * backWeight +
+            leftTemp * leftWeight +
+            rightTemp * rightWeight
+          ) / weightSum;
+        const { hue, light } = colorMapFLIR(
+          interpolatedTemp,
+          displayMin,
+          displayMax,
+        );
+        const { r, g, b } = hslToRgb(hue, light / 100, 1.0);
+
+        const pixelIndex = (y * width + x) * 4;
+        data[pixelIndex + 0] = r;
+        data[pixelIndex + 1] = g;
+        data[pixelIndex + 2] = b;
+        data[pixelIndex + 3] = 255;
+      }
+    }
+
+    heatmapCtx.putImageData(imageData, 0, 0);
+    heatmapCtx.imageSmoothingEnabled = false;
+    heatmapTexture.needsUpdate = true;
+
+    const now = Date.now();
+
+    heatSlices.forEach((slice, index) => {
+      const delay = index * HEAT_TIME_LAG_MS;
+      if (now - slice.userData.lastUpdateTime < delay) return;
+
+      const decayFactor = Math.exp(-HEAT_DECAY_PER_SLICE * index);
+      slice.userData.targetOpacity = HEAT_MAX_OPACITY * decayFactor;
+      slice.userData.targetEmissive = 0.6 * (decayFactor * decayFactor);
+
+      if (!slice.material.map) {
+        slice.material.map = heatmapTexture;
+        slice.material.emissiveMap = heatmapTexture;
+      }
+
+      slice.userData.lastUpdateTime = now;
+    });
+
+    return true;
+  }
+
   const ambient = new THREE.AmbientLight(0xffffff, 1);
   scene.add(ambient);
 
@@ -959,8 +1098,9 @@ function initThreeJS() {
   scene.add(dir);
 
   heatmapTexture = new THREE.CanvasTexture(heatmapCanvas);
-  heatmapTexture.minFilter = THREE.LinearFilter;
-  heatmapTexture.magFilter = THREE.LinearFilter;
+  heatmapTexture.minFilter = THREE.NearestFilter;
+  heatmapTexture.magFilter = THREE.NearestFilter;
+  heatmapTexture.generateMipmaps = false;
 
   const heatmapGeometry = new THREE.PlaneGeometry(
     ROOM_WIDTH * 0.9,
@@ -1388,19 +1528,27 @@ function initThreeJS() {
 
   let lastThermalLoopTime = 0;
   const THERMAL_LOOP_INTERVAL_MS = 30000;
+  let lastSensorHeatSignature = "";
 
   function updateThermalVisuals(now) {
     const roomState = thermalDataByRoom[REAL_ROOM_ID];
+    const sensorHeatSignature = SENSOR_KEYS.map((key) => {
+      const temp = Number(latestSensorState?.[key]?.temperature);
+      return Number.isFinite(temp) ? temp.toFixed(2) : "na";
+    }).join("|");
+    const hasSensorDrivenUpdate = sensorHeatSignature !== lastSensorHeatSignature;
     const hasImmediateDirtyFrame =
       !!roomState && roomState.dirty && Array.isArray(roomState.frame);
 
     if (
+      !hasSensorDrivenUpdate &&
       !hasImmediateDirtyFrame &&
       now - lastThermalLoopTime < THERMAL_LOOP_INTERVAL_MS
     ) {
       return;
     }
     lastThermalLoopTime = now;
+    lastSensorHeatSignature = sensorHeatSignature;
 
     if (activeRoom !== REAL_ROOM_ID) {
       heatSlices.forEach((slice) => {
@@ -1422,6 +1570,9 @@ function initThreeJS() {
         slice.userData.targetOpacity = HEAT_BASE_OPACITY;
         slice.userData.targetEmissive = HEAT_BASE_EMISSIVE;
       });
+      if (isHeatmapEnabled) {
+        updateHeatFromRoomSensors(latestSensorState);
+      }
       return;
     }
 
@@ -1436,14 +1587,13 @@ function initThreeJS() {
       slice.visible = isHeatmapEnabled;
     });
 
-    if (
-      isHeatmapEnabled &&
-      !roomState.stale &&
-      roomState.dirty &&
-      roomState.frame
-    ) {
-      updateHeatFromFrontSensor(roomState.frame);
-      roomState.dirty = false;
+    if (isHeatmapEnabled) {
+      const updatedFromSensors = updateHeatFromRoomSensors(latestSensorState);
+
+      if (!updatedFromSensors && !roomState.stale && roomState.dirty && roomState.frame) {
+        updateHeatFromFrontSensor(roomState.frame);
+        roomState.dirty = false;
+      }
     }
 
     if (roomState.restoreVisual) {
@@ -2183,6 +2333,7 @@ function listenToSideSensorsData() {
       if (!roomData || !roomData.nodeStatus) return;
 
       updateLeftSensorFromRoomData(roomData);
+      updateBackSensorFromRoomData(roomData);
       updateRightSensorFromRoomData(roomData);
     } catch (err) {
       // Keep side-sensor updater silent to avoid noisy logs every 2 seconds.

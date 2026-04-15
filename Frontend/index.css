@@ -520,11 +520,19 @@ canvas {
 
 .room-summary-card {
     flex: 0 0 auto;
+    padding: 0.5rem;
 }
 
 .middle-blank-card {
-    flex: 0 0 110px;
-    min-height: 110px;
+    flex: 0 0 140px;
+    min-height: 140px;
+    transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+}
+
+.middle-blank-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-hover);
+    border-color: #aac6ef;
 }
 
 .flir-guide {
@@ -535,7 +543,7 @@ canvas {
 
 .flir-guide-bar {
     width: 100%;
-    height: 16px;
+    height: 12px;
     border-radius: 999px;
     border: 1px solid rgba(183, 201, 225, 0.9);
     background: linear-gradient(
@@ -554,10 +562,56 @@ canvas {
 .flir-guide-labels {
     display: flex;
     justify-content: space-between;
-    font-size: 0.72rem;
+    font-size: 0.64rem;
     font-weight: 700;
     letter-spacing: 0.02em;
     color: #5a779e;
+}
+
+.flir-guide-ranges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.24rem 0.3rem;
+    margin-top: 0.05rem;
+}
+
+.flir-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 0.24rem;
+    font-size: 0.56rem;
+    font-weight: 600;
+    color: #516f96;
+    line-height: 1;
+    white-space: nowrap;
+    padding: 0.12rem 0.24rem;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.5);
+    border: 1px solid rgba(184, 205, 231, 0.9);
+}
+
+.flir-guide-ranges .swatch {
+    width: 10px;
+    height: 6px;
+    border-radius: 999px;
+    border: 1px solid rgba(173, 194, 220, 0.92);
+    flex: 0 0 auto;
+}
+
+.swatch-blue-green {
+    background: linear-gradient(90deg, #1735c5 0%, #22c55e 100%);
+}
+
+.swatch-green-yellow {
+    background: linear-gradient(90deg, #22c55e 0%, #fde047 100%);
+}
+
+.swatch-yellow-orange {
+    background: linear-gradient(90deg, #fde047 0%, #fb923c 100%);
+}
+
+.swatch-orange-red {
+    background: linear-gradient(90deg, #fb923c 0%, #ef4444 100%);
 }
 
 .selected-sensor-card {
@@ -567,6 +621,7 @@ canvas {
 .dss-modern-card {
     flex: 1 1 0;
     min-height: 0;
+    padding: 0.85rem;
 }
 
 .details-card-header {
@@ -600,7 +655,7 @@ canvas {
     border-radius: 14px;
     border: 1px solid rgba(201,217,238,0.95);
     background: rgba(255,255,255,0.72);
-    padding: 0.72rem 0.85rem;
+    padding: 0.42rem 0.58rem;
     transition: transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease;
 }
 
@@ -740,8 +795,8 @@ canvas {
 
 #dss-content {
     white-space: pre-line !important;
-    font-size: 0.84rem;
-    line-height: 1.4;
+    font-size: 0.8rem;
+    line-height: 1.32;
     overflow-y: auto !important;
     word-break: break-word;
     flex: 1;
@@ -750,12 +805,12 @@ canvas {
 }
 
 #dss-content p {
-    font-size: 0.84rem;
+    font-size: 0.8rem;
     display: block !important;
     white-space: normal !important;
     overflow: visible !important;
     text-overflow: unset !important;
-    margin: 3px 0;
+    margin: 2px 0;
     word-break: break-word;
 }
 
@@ -1538,6 +1593,16 @@ body.dark-mode .flir-guide-bar {
 
 body.dark-mode .flir-guide-labels {
     color: #b9ceea;
+}
+
+body.dark-mode .flir-legend-item {
+    color: #b7cce8;
+    background: rgba(33, 52, 77, 0.45);
+    border-color: rgba(96, 124, 160, 0.9);
+}
+
+body.dark-mode .flir-guide-ranges .swatch {
+    border-color: rgba(115, 142, 176, 0.95);
 }
 
 body.dark-mode .sensor-status-badge {

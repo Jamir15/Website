@@ -1,19 +1,19 @@
 :root {
-    --bg-color: #eef3fa;
-    --panel-bg: #f8fbff;
-    --text-color: #10223a;
-    --accent-color: #000000;
-    --card-bg: #e7eef8;
-    --border-soft: #c9d9ee;
+    --bg-color: #dceeff;
+    --panel-bg: #f1f8ff;
+    --text-color: #0f2a47;
+    --accent-color: #1e5bb8;
+    --card-bg: #e8f3ff;
+    --border-soft: #b8d3f0;
     --shadow-soft: 0 8px 20px rgba(16, 34, 58, 0.08);
     --shadow-hover: 0 12px 24px rgba(11, 110, 253, 0.18);
-    --sidebar-dark-bg: #edf4ff;
-    --sidebar-dark-bg-2: #e3eefc;
-    --sidebar-dark-border: #c5d7ee;
-    --sidebar-dark-text: #153154;
-    --sidebar-dark-muted: #4d6788;
-    --sidebar-dark-hover: #d8e8fb;
-    --sidebar-dark-active: #c7dcf6;
+    --sidebar-dark-bg: #e6f2ff;
+    --sidebar-dark-bg-2: #d7e9ff;
+    --sidebar-dark-border: #b4cfee;
+    --sidebar-dark-text: #123a6b;
+    --sidebar-dark-muted: #4a6f99;
+    --sidebar-dark-hover: #cce3ff;
+    --sidebar-dark-active: #bddbff;
 }
 
 /* -------------------------------------------------
@@ -27,7 +27,7 @@
 
 body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background: radial-gradient(circle at top left, #ffffff 0%, var(--bg-color) 45%, #e3edf9 100%);
+    background: radial-gradient(circle at top left, #f9fcff 0%, var(--bg-color) 45%, #cfe6ff 100%);
     color: var(--text-color);
     height: 100vh;
     overflow: hidden;
@@ -385,7 +385,7 @@ body.assistant-chat-open .layout-grid {
     min-height: 100%;
     overflow: hidden;
     background:
-        radial-gradient(circle at top left, rgba(255,255,255,0.95) 0%, rgba(225,237,252,0.88) 38%, rgba(202,219,243,0.96) 100%);
+        radial-gradient(circle at top left, rgba(250,253,255,0.96) 0%, rgba(217,236,255,0.90) 40%, rgba(189,216,247,0.96) 100%);
 }
 
 .viewer-stage-header {

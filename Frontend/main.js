@@ -809,10 +809,10 @@ function initThreeJS() {
   labelRenderer.domElement.style.pointerEvents = "none";
   container.appendChild(labelRenderer.domElement);
 
-  const ROOM_OFFSET_X = -3.5;
-  const DEFAULT_TARGET = new THREE.Vector3(ROOM_OFFSET_X, 0.95, -0.35);
+  const ROOM_OFFSET_X = 0;
+  const DEFAULT_TARGET = new THREE.Vector3(ROOM_OFFSET_X, 0.95, 0);
   const DEFAULT_CAMERA_POSITION = new THREE.Vector3(
-    ROOM_OFFSET_X - 5.0,
+    ROOM_OFFSET_X,
     4.5,
     9.2,
   );
@@ -827,7 +827,7 @@ function initThreeJS() {
   controls.panSpeed = 0.65;
   controls.screenSpacePanning = false;
   controls.enablePan = true;
-  controls.minDistance = 4.8;
+  controls.minDistance = 1.2;
   controls.maxDistance = 15;
   controls.minPolarAngle = 0.6;
   controls.maxPolarAngle = 1.42;
@@ -1339,7 +1339,7 @@ function initThreeJS() {
       const maxDim = Math.max(size.x, size.y, size.z) || 7;
 
       camera.position.set(
-        ROOM_OFFSET_X - 5.2,
+        ROOM_OFFSET_X,
         Math.max(4.5, size.y * 0.95 + 2.0),
         Math.max(8.0, maxDim * 1.35),
       );
@@ -1347,10 +1347,10 @@ function initThreeJS() {
       controls.target.set(
         ROOM_OFFSET_X,
         Math.max(0.85, size.y * 0.34),
-        -0.45,
+        0,
       );
 
-      controls.minDistance = Math.max(4.8, maxDim * 0.62);
+      controls.minDistance = Math.max(1.2, maxDim * 0.18);
       controls.maxDistance = Math.max(15, maxDim * 2.3);
       controls.update();
 

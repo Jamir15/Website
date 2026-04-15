@@ -378,6 +378,7 @@ body.assistant-chat-open .layout-grid {
 }
 
 .viewer-stage-shell {
+    --details-panel-width: min(360px, calc(100% - 2rem));
     position: relative;
     width: 100%;
     height: 100%;
@@ -450,8 +451,10 @@ body.assistant-chat-open .layout-grid {
 
 .viewer-stage {
     position: absolute;
-    inset: 0;
-    width: 100%;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    right: calc(1rem + var(--details-panel-width));
     height: 100%;
 }
 
@@ -491,10 +494,11 @@ canvas {
     top: 1rem;
     right: 1rem;
     bottom: 1rem;
-    width: min(360px, calc(100% - 2rem));
+    width: var(--details-panel-width);
     z-index: 30;
     display: flex;
     flex-direction: column;
+    align-items: center;
     gap: 0.75rem;
     pointer-events: none;
 }
@@ -505,6 +509,8 @@ canvas {
     border-radius: 18px;
     box-shadow: 0 14px 36px rgba(16, 34, 58, 0.12);
     padding: 0.85rem;
+    width: min(340px, 100%);
+    margin-inline: auto;
     display: flex;
     flex-direction: column;
     gap: 0.75rem;
@@ -519,6 +525,39 @@ canvas {
 .middle-blank-card {
     flex: 0 0 110px;
     min-height: 110px;
+}
+
+.flir-guide {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+}
+
+.flir-guide-bar {
+    width: 100%;
+    height: 16px;
+    border-radius: 999px;
+    border: 1px solid rgba(183, 201, 225, 0.9);
+    background: linear-gradient(
+        90deg,
+        hsl(240, 100%, 35%) 0%,
+        hsl(220, 100%, 39%) 18%,
+        hsl(190, 100%, 44%) 36%,
+        hsl(140, 100%, 49%) 54%,
+        hsl(72, 100%, 56%) 72%,
+        hsl(28, 100%, 62%) 88%,
+        hsl(0, 100%, 65%) 100%
+    );
+    box-shadow: inset 0 1px 2px rgba(16, 34, 58, 0.16);
+}
+
+.flir-guide-labels {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    color: #5a779e;
 }
 
 .selected-sensor-card {
@@ -1492,6 +1531,15 @@ body.dark-mode .summary-value .unit {
     color: #bad1f3;
 }
 
+body.dark-mode .flir-guide-bar {
+    border-color: rgba(102, 128, 163, 0.95);
+    box-shadow: inset 0 1px 2px rgba(4, 12, 22, 0.45);
+}
+
+body.dark-mode .flir-guide-labels {
+    color: #b9ceea;
+}
+
 body.dark-mode .sensor-status-badge {
     background: rgba(59, 130, 246, 0.16);
     border-color: rgba(147, 197, 253, 0.28);
@@ -1629,6 +1677,10 @@ body.dark-mode .assistant-chat-toggle {
    RESPONSIVE
 -------------------------------------------------- */
 @media (max-width: 1200px) {
+    .viewer-stage-shell {
+        --details-panel-width: min(340px, calc(100% - 2rem));
+    }
+
     .monitor-details-panel {
         width: min(340px, calc(100% - 2rem));
     }
@@ -1643,6 +1695,10 @@ body.dark-mode .assistant-chat-toggle {
 }
 
 @media (max-width: 1024px) {
+    .viewer-stage-shell {
+        --details-panel-width: min(320px, calc(100% - 2rem));
+    }
+
     .layout-grid {
         grid-template-columns: 150px 1fr 0;
     }
@@ -1661,6 +1717,10 @@ body.dark-mode .assistant-chat-toggle {
 }
 
 @media (max-width: 900px) {
+    .viewer-stage {
+        right: 0;
+    }
+
     .layout-grid {
         grid-template-columns: 160px 1fr;
         grid-template-rows: 1fr;

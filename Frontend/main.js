@@ -507,18 +507,23 @@ function updateLeftSensorFromRoomData(roomData) {
     return;
   }
 
+  const leftTemperature = Number(
+    nodeLeft.temperature ?? nodeLeft.temp ?? nodeLeft.airTemperature,
+  );
+  const leftHumidity = Number(
+    nodeLeft.humidity ?? nodeLeft.rh ?? nodeLeft.relativeHumidity,
+  );
+
   const nextState = {
     ...latestSensorState,
     left: {
       ...currentLeft,
-      temperature:
-        typeof nodeLeft.temperature === "number"
-          ? Number(nodeLeft.temperature)
-          : currentLeft.temperature,
-      humidity:
-        typeof nodeLeft.humidity === "number"
-          ? Number(nodeLeft.humidity)
-          : currentLeft.humidity,
+      temperature: Number.isFinite(leftTemperature)
+        ? leftTemperature
+        : currentLeft.temperature,
+      humidity: Number.isFinite(leftHumidity)
+        ? leftHumidity
+        : currentLeft.humidity,
       heatIndex: currentLeft.heatIndex,
       label: currentLeft.label,
       advisory: currentLeft.advisory,
@@ -540,18 +545,23 @@ function updateRightSensorFromRoomData(roomData) {
     return;
   }
 
+  const rightTemperature = Number(
+    nodeRight.temperature ?? nodeRight.temp ?? nodeRight.airTemperature,
+  );
+  const rightHumidity = Number(
+    nodeRight.humidity ?? nodeRight.rh ?? nodeRight.relativeHumidity,
+  );
+
   const nextState = {
     ...latestSensorState,
     right: {
       ...currentRight,
-      temperature:
-        typeof nodeRight.temperature === "number"
-          ? Number(nodeRight.temperature)
-          : currentRight.temperature,
-      humidity:
-        typeof nodeRight.humidity === "number"
-          ? Number(nodeRight.humidity)
-          : currentRight.humidity,
+      temperature: Number.isFinite(rightTemperature)
+        ? rightTemperature
+        : currentRight.temperature,
+      humidity: Number.isFinite(rightHumidity)
+        ? rightHumidity
+        : currentRight.humidity,
       heatIndex: currentRight.heatIndex,
       label: currentRight.label,
       advisory: currentRight.advisory,

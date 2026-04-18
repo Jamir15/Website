@@ -935,43 +935,60 @@ function initThreeJS() {
   const heatmapCtx = heatmapCanvas.getContext("2d");
   heatmapCtx.imageSmoothingEnabled = false;
 
-  function colorMapFLIR(value, minValue, maxValue) {
+  // Perceptually-optimized thermal color mapping
+  // Returns vibrant, saturated colors with pure red at critical temperatures
+  function colorMapThermal(value, minValue, maxValue) {
+    // Normalize temperature to 0-1 range
     let t = (value - minValue) / (maxValue - minValue);
     if (!isFinite(t)) t = 0;
     t = Math.max(0, Math.min(1, t));
-    t = Math.pow(t, 1.8);
-    const hue = (1 - t) * 240;
-    const light = 35 + t * 30;
-    return { hue, light };
-  }
 
-  function hslToRgb(h, l, s = 1.0) {
-    function hue2rgb(p, q, t) {
-      if (t < 0) t += 1;
-      if (t > 1) t -= 1;
-      if (t < 1 / 6) return p + (q - p) * 6 * t;
-      if (t < 1 / 2) return q;
-      if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
-      return p;
-    }
+    // Critical temperature threshold: 41.5°C = pure bright red
+    const CRITICAL_TEMP = 41.5;
+    const isCritical = value >= CRITICAL_TEMP;
 
-    h = h / 360;
-    let r, g, b;
+    let r = 0, g = 0, b = 0;
 
-    if (s === 0) {
-      r = g = b = l;
+    if (isCritical) {
+      // Critical: Pure bright red
+      r = 255;
+      g = 0;
+      b = 0;
+    } else if (t < 0.2) {
+      // Cool: Deep blue
+      r = 0;
+      g = 100 + t * 155 * 5; // 100 → 155
+      b = 255 - t * 100 * 5; // 255 → 155
+    } else if (t < 0.4) {
+      // Moderate cool: Cyan to green
+      const localT = (t - 0.2) / 0.2;
+      r = 0;
+      g = 200 + localT * 55;
+      b = 155 - localT * 155;
+    } else if (t < 0.6) {
+      // Moderate warm: Green to yellow
+      const localT = (t - 0.4) / 0.2;
+      r = 255 * localT;
+      g = 255;
+      b = 0;
+    } else if (t < 0.8) {
+      // Warm: Yellow to orange
+      const localT = (t - 0.6) / 0.2;
+      r = 255;
+      g = 255 - localT * 165; // 255 → 90
+      b = 0;
     } else {
-      const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
-      const p = 2 * l - q;
-      r = hue2rgb(p, q, h + 1 / 3);
-      g = hue2rgb(p, q, h);
-      b = hue2rgb(p, q, h - 1 / 3);
+      // Hot: Orange to red
+      const localT = (t - 0.8) / 0.2;
+      r = 255;
+      g = 90 - localT * 90; // 90 → 0
+      b = 0;
     }
 
     return {
-      r: Math.round(r * 255),
-      g: Math.round(g * 255),
-      b: Math.round(b * 255),
+      r: Math.round(Math.max(0, Math.min(255, r))),
+      g: Math.round(Math.max(0, Math.min(255, g))),
+      b: Math.round(Math.max(0, Math.min(255, b))),
     };
   }
 
@@ -996,8 +1013,7 @@ function initThreeJS() {
         const sensorIndex = srcY * 32 + srcX;
 
         const temp = frame[sensorIndex];
-        const { hue, light } = colorMapFLIR(temp, minT, maxT);
-        const { r, g, b } = hslToRgb(hue, light / 100, 1.0);
+        const { r, g, b } = colorMapThermal(temp, minT, maxT);
 
         const pixelIndex = (y * 32 + x) * 4;
         data[pixelIndex + 0] = r;
@@ -1088,12 +1104,11 @@ function initThreeJS() {
             leftTemp * leftWeight +
             rightTemp * rightWeight
           ) / weightSum;
-        const { hue, light } = colorMapFLIR(
+        const { r, g, b } = colorMapThermal(
           interpolatedTemp,
           displayMin,
           displayMax,
         );
-        const { r, g, b } = hslToRgb(hue, light / 100, 1.0);
 
         const pixelIndex = (y * width + x) * 4;
         data[pixelIndex + 0] = r;

@@ -2322,12 +2322,12 @@ async function listenToData() {
   const startPolling = () => {
     if (pollingIntervalId) clearInterval(pollingIntervalId);
 
-    let interval = 60000;
+    let interval = 2000;
 
     if (connectionQuality === "fair") {
-      interval = 90000;
+      interval = 2000;
     } else if (connectionQuality === "poor") {
-      interval = 120000;
+      interval = 2000;
     }
 
     pollingIntervalId = setInterval(poll, interval);

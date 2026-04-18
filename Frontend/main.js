@@ -496,6 +496,7 @@ function setSensorStateFromRoomData(roomData) {
 
   if (threeApp) {
     threeApp.updateSensorVisuals(latestSensorState);
+    threeApp.updateHeatFromRoomSensors(latestSensorState);
   }
 }
 
@@ -534,6 +535,7 @@ function updateFrontSensorFromRoomData(roomData) {
 
   if (threeApp) {
     threeApp.updateSensorVisuals(latestSensorState);
+    threeApp.updateHeatFromRoomSensors(latestSensorState);
   }
 }
 
@@ -572,6 +574,7 @@ function updateLeftSensorFromRoomData(roomData) {
 
   if (threeApp) {
     threeApp.updateSensorVisuals(latestSensorState);
+    threeApp.updateHeatFromRoomSensors(latestSensorState);
   }
 }
 
@@ -610,6 +613,7 @@ function updateBackSensorFromRoomData(roomData) {
 
   if (threeApp) {
     threeApp.updateSensorVisuals(latestSensorState);
+    threeApp.updateHeatFromRoomSensors(latestSensorState);
   }
 }
 
@@ -648,6 +652,7 @@ function updateRightSensorFromRoomData(roomData) {
 
   if (threeApp) {
     threeApp.updateSensorVisuals(latestSensorState);
+    threeApp.updateHeatFromRoomSensors(latestSensorState);
   }
 }
 
@@ -689,6 +694,7 @@ function setReservedSensorVisualState() {
 
   if (threeApp) {
     threeApp.updateSensorVisuals(latestSensorState);
+    threeApp.updateHeatFromRoomSensors(latestSensorState);
   }
 }
 
@@ -938,23 +944,23 @@ function initThreeJS() {
   // Perceptually-optimized thermal color mapping
   // Returns vibrant, saturated colors with pure red at critical temperatures
   function colorMapThermal(value, minValue, maxValue) {
+    // Critical temperature threshold: 41.5°C = pure bright red (absolute, not relative)
+    const CRITICAL_TEMP = 41.5;
+    const isCritical = value >= CRITICAL_TEMP;
+
+    // If critical, return pure bright red immediately
+    if (isCritical) {
+      return { r: 255, g: 0, b: 0 };
+    }
+
     // Normalize temperature to 0-1 range
     let t = (value - minValue) / (maxValue - minValue);
     if (!isFinite(t)) t = 0;
     t = Math.max(0, Math.min(1, t));
 
-    // Critical temperature threshold: 41.5°C = pure bright red
-    const CRITICAL_TEMP = 41.5;
-    const isCritical = value >= CRITICAL_TEMP;
-
     let r = 0, g = 0, b = 0;
 
-    if (isCritical) {
-      // Critical: Pure bright red
-      r = 255;
-      g = 0;
-      b = 0;
-    } else if (t < 0.2) {
+    if (t < 0.2) {
       // Cool: Deep blue
       r = 0;
       g = 100 + t * 155 * 5; // 100 → 155
@@ -1677,9 +1683,11 @@ function initThreeJS() {
 
   animate();
   updateSensorVisuals(latestSensorState);
+  updateHeatFromRoomSensors(latestSensorState);
 
   return {
     updateSensorVisuals,
+    updateHeatFromRoomSensors,
   };
 }
 

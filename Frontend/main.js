@@ -349,7 +349,7 @@ const defaultSensorState = {
     advisory: ["Waiting data..."],
   },
   left: {
-    name: "Left Node",
+    name: "Right Node",
     temperature: null,
     humidity: null,
     heatIndex: null,
@@ -357,7 +357,7 @@ const defaultSensorState = {
     advisory: ["Waiting data..."],
   },
   right: {
-    name: "Right Node",
+    name: "Left Node",
     temperature: null,
     humidity: null,
     heatIndex: null,
@@ -670,7 +670,7 @@ function setReservedSensorVisualState() {
       advisory: ["Room 2 is reserved for future expansion."],
     },
     left: {
-      name: "Left Node",
+      name: "Right Node",
       temperature: null,
       humidity: null,
       heatIndex: null,
@@ -678,7 +678,7 @@ function setReservedSensorVisualState() {
       advisory: ["Room 2 is reserved for future expansion."],
     },
     right: {
-      name: "Right Node",
+      name: "Left Node",
       temperature: null,
       humidity: null,
       heatIndex: null,
@@ -865,7 +865,7 @@ function buildSensorLabelElement(sensorName) {
   el.appendChild(primary);
   el.appendChild(secondary);
 
-  return { root: el, primary, secondary };
+  return { root: el, primary, secondary, title };
 }
 
 function initThreeJS() {
@@ -1285,6 +1285,7 @@ function initThreeJS() {
       labelObject,
       labelPrimary: labelPieces.primary,
       labelSecondary: labelPieces.secondary,
+      labelTitle: labelPieces.title,
     };
   }
 
@@ -1301,6 +1302,7 @@ function initThreeJS() {
       marker.mesh.material.emissive.setHex(color);
       marker.mesh.material.emissiveIntensity = 0.45;
 
+      marker.labelTitle.textContent = state.name;
       marker.labelPrimary.textContent = formatMetricValue(
         state.temperature,
         "°C",

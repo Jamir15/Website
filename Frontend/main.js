@@ -2324,12 +2324,12 @@ async function listenToData() {
   const startPolling = () => {
     if (pollingIntervalId) clearInterval(pollingIntervalId);
 
-    let interval = 2000;
+    let interval = 500;
 
     if (connectionQuality === "fair") {
-      interval = 2000;
+      interval = 500;
     } else if (connectionQuality === "poor") {
-      interval = 2000;
+      interval = 500;
     }
 
     pollingIntervalId = setInterval(poll, interval);
@@ -2384,7 +2384,7 @@ function listenToSideSensorsData() {
   };
 
   pollSideSensors();
-  setInterval(pollSideSensors, 2000);
+  setInterval(pollSideSensors, 500);
 }
 
 /* =====================================================================

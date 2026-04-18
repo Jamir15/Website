@@ -2188,161 +2188,222 @@ async function fetchDataWithRetry(roomId, retryCount = 0) {
   }
 }
 
-async function listenToData() {
-  let pollingIntervalId;
+function listenToData() {
+  // Real-time listener for all 4 sensor documents
+  const sensorStates = {
+    front: null,
+    back: null,
+    left: null,
+    right: null,
+  };
 
-  const poll = async () => {
-    if (activeRoom !== REAL_ROOM_ID) {
-      return;
-    }
+  let thermalData = null;
 
-    try {
-      const roomData = await fetchDataWithRetry(REAL_ROOM_ID);
+  const processSensorData = () => {
+    const validReadings = [];
+    const nodeStatus = {};
 
-      if (!roomData) throw new Error("No room data");
-
-      const temp = Number(roomData.averageTemperature);
-      const hum = Number(roomData.averageHumidity);
-      const hi = Number(roomData.heatIndex);
-
-      backendDown = false;
-
-      const monitoringStatus =
-        roomData.monitoringStatus || "Based on 4 sensor positions";
-
-      updateDashboard(
-        temp,
-        hum,
-        hi,
-        roomData.label,
-        roomData.advisory,
-        monitoringStatus,
-        roomData,
-      );
-      updateSparkline(temp, hum, hi);
-
-      latestAIContext = {
-        room: REAL_ROOM_ID,
-        temperature: temp,
-        humidity: hum,
-        heatIndex: hi,
-        label: roomData.label,
-        advisory: roomData.advisory,
-      };
-
-      updateAIContext({
-        room: REAL_ROOM_ID,
-        temperature: temp,
-        humidity: hum,
-        heatIndex: hi,
-        label: roomData.label,
-        advisory: roomData.advisory,
-        backendDown: false,
-        sensorsDown: false,
-      });
-    } catch (err) {
-      consecutiveFailures++;
-      connectionQuality =
-        consecutiveFailures > 2
-          ? "poor"
-          : consecutiveFailures > 1
-            ? "fair"
-            : "good";
-
-      if (!backendDown) {
-        console.warn(
-          `Backend error (attempt ${consecutiveFailures}):`,
-          err.message,
-        );
-        backendDown = true;
-      }
-
-      const cachedData = getCachedData();
-
-      let temp, hum, fallbackHI, label, advisory, fallbackRoomData;
-
-      if (cachedData) {
-        temp = Number(cachedData.averageTemperature);
-        hum = Number(cachedData.averageHumidity);
-        fallbackHI = Number(cachedData.heatIndex);
-        label = `${cachedData.label} (CACHED)`;
-        advisory = [
-          ...toAdvisoryArray(cachedData.advisory),
-          "Using cached data due to connection issues.",
-        ];
-        fallbackRoomData = {
-          ...cachedData,
-          label,
-          advisory,
+    Object.entries(sensorStates).forEach(([position, sensorData]) => {
+      if (sensorData && sensorData.available) {
+        validReadings.push({
+          position,
+          temperature: sensorData.temperature,
+          humidity: sensorData.humidity,
+        });
+        nodeStatus[position] = {
+          available: true,
+          temperature: sensorData.temperature,
+          humidity: sensorData.humidity,
         };
       } else {
-        temp = latestAIContext.temperature || 30;
-        hum = latestAIContext.humidity || 60;
-        fallbackHI = computeFallbackHeatIndex(temp, hum);
-        label = "ESTIMATED (FALLBACK)";
-        advisory = [
-          "Backend Decision Support System unavailable.",
-          "Using local heat index estimation.",
-          "Check your WiFi connection.",
-        ];
-        fallbackRoomData = {
-          averageTemperature: temp,
-          averageHumidity: hum,
-          heatIndex: fallbackHI,
-          label,
-          advisory,
+        nodeStatus[position] = {
+          available: false,
+          temperature: null,
+          humidity: null,
         };
       }
+    });
 
-      updateDashboard(
-        temp,
-        hum,
-        fallbackHI,
-        label,
-        advisory,
-        `Fallback mode (${connectionQuality} connection)`,
-        fallbackRoomData,
-      );
-
-      updateSparkline(temp, hum, fallbackHI);
-
-      updateAIContext({
-        room: REAL_ROOM_ID,
-        temperature: temp,
-        humidity: hum,
-        heatIndex: fallbackHI,
-        label,
-        advisory,
-        backendDown: true,
-        sensorsDown: false,
-      });
-    }
-  };
-
-  await poll();
-
-  const startPolling = () => {
-    if (pollingIntervalId) clearInterval(pollingIntervalId);
-
-    let interval = 500;
-
-    if (connectionQuality === "fair") {
-      interval = 500;
-    } else if (connectionQuality === "poor") {
-      interval = 500;
+    if (validReadings.length === 0) {
+      console.warn("No valid sensor readings available");
+      return null;
     }
 
-    pollingIntervalId = setInterval(poll, interval);
+    const avgTemp =
+      validReadings.reduce((sum, r) => sum + r.temperature, 0) /
+      validReadings.length;
+    const avgHum =
+      validReadings.reduce((sum, r) => sum + r.humidity, 0) /
+      validReadings.length;
+
+    const roundedTemp = Number(avgTemp.toFixed(1));
+    const roundedHum = Number(avgHum.toFixed(1));
+
+    const heatIdx = computeHeatIndex(roundedTemp, roundedHum);
+    const label = getHeatIndexLabel(heatIdx);
+    const advisory = getHeatIndexAdvisory(heatIdx);
+
+    const monitoringStatus =
+      validReadings.length === 4
+        ? "Based on 4 sensor positions"
+        : `Degraded Monitoring: Running on ${validReadings.length} of 4 nodes`;
+
+    return {
+      averageTemperature: roundedTemp,
+      averageHumidity: roundedHum,
+      heatIndex: heatIdx,
+      label,
+      advisory: Array.isArray(advisory) ? advisory : [advisory],
+      monitoringStatus,
+      nodeStatus,
+      thermal: thermalData,
+      availableNodes: validReadings.length,
+      totalNodes: 4,
+    };
   };
 
-  startPolling();
+  const updateFromSensorData = () => {
+    if (activeRoom !== REAL_ROOM_ID) return;
+
+    const roomData = processSensorData();
+    if (!roomData) return;
+
+    backendDown = false;
+    consecutiveFailures = 0;
+    connectionQuality = "good";
+
+    const temp = roomData.averageTemperature;
+    const hum = roomData.averageHumidity;
+    const hi = roomData.heatIndex;
+
+    updateDashboard(
+      temp,
+      hum,
+      hi,
+      roomData.label,
+      roomData.advisory,
+      roomData.monitoringStatus,
+      roomData,
+    );
+    updateSparkline(temp, hum, hi);
+
+    latestAIContext = {
+      room: REAL_ROOM_ID,
+      temperature: temp,
+      humidity: hum,
+      heatIndex: hi,
+      label: roomData.label,
+      advisory: roomData.advisory,
+    };
+
+    updateAIContext({
+      room: REAL_ROOM_ID,
+      temperature: temp,
+      humidity: hum,
+      heatIndex: hi,
+      label: roomData.label,
+      advisory: roomData.advisory,
+      backendDown: false,
+      sensorsDown: false,
+    });
+
+    cacheSuccessfulData(roomData);
+  };
+
+  // Listen to each sensor document in real-time
+  const sensorPositions = ["front", "back", "left", "right"];
+  const sensorDocIds = {
+    front: "room1_front",
+    back: "room1_back",
+    left: "room1_left",
+    right: "room1_right",
+  };
+
+  sensorPositions.forEach((position) => {
+    const docRef = doc(db, "sensorData", sensorDocIds[position]);
+    onSnapshot(
+      docRef,
+      (snap) => {
+        if (snap.exists()) {
+          const data = snap.data();
+          const temp = Number(data.Temperature);
+          const hum = Number(Math.min(Math.max(data.Humidity, 0), 100));
+
+          if (Number.isFinite(temp) && Number.isFinite(hum)) {
+            sensorStates[position] = {
+              available: true,
+              temperature: Number(temp.toFixed(1)),
+              humidity: Number(hum.toFixed(1)),
+            };
+          } else {
+            sensorStates[position] = {
+              available: false,
+              temperature: null,
+              humidity: null,
+            };
+          }
+        } else {
+          sensorStates[position] = {
+            available: false,
+            temperature: null,
+            humidity: null,
+          };
+        }
+
+        updateFromSensorData();
+      },
+      (error) => {
+        console.warn(
+          `Error listening to sensor ${position}:`,
+          error.message,
+        );
+        sensorStates[position] = {
+          available: false,
+          temperature: null,
+          humidity: null,
+        };
+      },
+    );
+  });
+
+  // Listen to thermal data in real-time
+  const thermalRef = doc(db, "thermalRooms", "room1");
+  onSnapshot(
+    thermalRef,
+    (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        if (Array.isArray(data.frame) && data.frame.length === 768) {
+          const processedFrame = data.frame
+            .filter((v) => typeof v === "number" && !isNaN(v))
+            .map((v) => v / 100);
+
+          if (processedFrame.length > 0) {
+            const min = Math.min(...processedFrame);
+            const max = Math.max(...processedFrame);
+
+            thermalData = {
+              frame: processedFrame,
+              width: data.width,
+              height: data.height,
+              min,
+              max,
+            };
+          }
+        }
+      }
+
+      updateFromSensorData();
+    },
+    (error) => {
+      console.warn("Error listening to thermal data:", error.message);
+    },
+  );
 
   window.addEventListener("online", () => {
     console.log("Connection restored");
     connectionQuality = "good";
     consecutiveFailures = 0;
-    startPolling();
-    poll();
   });
 
   window.addEventListener("offline", () => {
@@ -2352,39 +2413,54 @@ async function listenToData() {
 }
 
 function listenToSideSensorsData() {
-  let isFetchingSideSensors = false;
-
-  const pollSideSensors = async () => {
-    if (activeRoom !== REAL_ROOM_ID || isFetchingSideSensors) {
-      return;
-    }
-
-    try {
-      isFetchingSideSensors = true;
-      const res = await fetchWithTimeout(
-        `${BACKEND_URL}/api/${REAL_ROOM_ID}`,
-        5000,
-      );
-
-      if (!res.ok) return;
-
-      const json = await res.json();
-      const roomData = json[REAL_ROOM_ID];
-      if (!roomData || !roomData.nodeStatus) return;
-      
-      updateFrontSensorFromRoomData(roomData);
-      updateLeftSensorFromRoomData(roomData);
-      updateBackSensorFromRoomData(roomData);
-      updateRightSensorFromRoomData(roomData);
-    } catch (err) {
-      // Keep side-sensor updater silent to avoid noisy logs every 2 seconds.
-    } finally {
-      isFetchingSideSensors = false;
-    }
+  // Side sensors now update in real-time through listenToData()
+  // This function is kept for backward compatibility but the actual
+  // side sensor updates are now triggered by onSnapshot listeners
+  const sensorDocIds = {
+    front: "room1_front",
+    back: "room1_back",
+    left: "room1_left",
+    right: "room1_right",
   };
 
-  pollSideSensors();
-  setInterval(pollSideSensors, 500);
+  Object.entries(sensorDocIds).forEach(([position, docId]) => {
+    const docRef = doc(db, "sensorData", docId);
+    onSnapshot(
+      docRef,
+      (snap) => {
+        if (!snap.exists()) return;
+
+        const data = snap.data();
+        const roomData = {
+          nodeStatus: {
+            [position]: {
+              available: true,
+              temperature: Number(data.Temperature),
+              humidity: Number(data.Humidity),
+              temp: Number(data.Temperature),
+              rh: Number(data.Humidity),
+            },
+          },
+        };
+
+        if (position === "front") {
+          updateFrontSensorFromRoomData(roomData);
+        } else if (position === "left") {
+          updateLeftSensorFromRoomData(roomData);
+        } else if (position === "back") {
+          updateBackSensorFromRoomData(roomData);
+        } else if (position === "right") {
+          updateRightSensorFromRoomData(roomData);
+        }
+      },
+      (error) => {
+        console.warn(
+          `Error listening to side sensor ${position}:`,
+          error.message,
+        );
+      },
+    );
+  });
 }
 
 /* =====================================================================

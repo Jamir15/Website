@@ -29,6 +29,129 @@ const BACKEND_URL = "https://website-jbd4.onrender.com";
 const REAL_ROOM_ID = "room1";
 
 /* =====================================================================
+ * DSS Functions - Heat Index Calculation
+ * ===================================================================== */
+
+function computeHeatIndex(tempC, humidity) {
+  // Validate inputs
+  if (
+    typeof tempC !== "number" ||
+    typeof humidity !== "number" ||
+    isNaN(tempC) ||
+    isNaN(humidity)
+  ) {
+    return null;
+  }
+
+  // Clamp humidity safely
+  humidity = Math.max(0, Math.min(100, humidity));
+
+  const T = (tempC * 9) / 5 + 32; // Celsius to Fahrenheit
+  const R = humidity;
+
+  let HI_F;
+
+  // 1. Below 20°C -> Heat Index equals air temperature
+  if (tempC < 20) {
+    return Number(tempC.toFixed(1));
+  }
+
+  // 2. 20°C to below 26.7°C -> Steadman simple approximation
+  if (tempC >= 20 && tempC < 26.7) {
+    HI_F =
+      0.5 *
+      (T + 61.0 + (T - 68.0) * 1.2 + R * 0.094);
+
+    // If result stays below 80°F, use Steadman result
+    if (HI_F < 80) {
+      const HI_C = ((HI_F - 32) * 5) / 9;
+      return Number(Math.max(HI_C, tempC).toFixed(1));
+    }
+    // Otherwise continue to Rothfusz
+  }
+
+  // 3. Rothfusz regression
+  HI_F =
+    -42.379 +
+    2.04901523 * T +
+    10.14333127 * R -
+    0.22475541 * T * R -
+    0.00683783 * T * T -
+    0.05481717 * R * R +
+    0.00122874 * T * T * R +
+    0.00085282 * T * R * R -
+    0.00000199 * T * T * R * R;
+
+  // Low humidity adjustment
+  if (R < 13 && T >= 80 && T <= 112) {
+    HI_F -= ((13 - R) / 4) * Math.sqrt((17 - Math.abs(T - 95)) / 17);
+  }
+
+  // High humidity adjustment
+  if (R > 85 && T >= 80 && T <= 87) {
+    HI_F += ((R - 85) / 10) * ((87 - T) / 5);
+  }
+
+  const HI_C = ((HI_F - 32) * 5) / 9;
+
+  // Never allow HI to go below actual temperature
+  return Number(Math.max(HI_C, tempC).toFixed(1));
+}
+
+function getHeatIndexLabel(heatIndex) {
+  if (heatIndex == null) return null;
+
+  if (heatIndex < 27) return "Normal";
+  if (heatIndex < 33) return "Caution";
+  if (heatIndex < 41.1) return "Extreme Caution";
+  if (heatIndex < 52) return "Danger";
+  return "Extreme Danger";
+}
+
+function getHeatIndexAdvisory(heatIndex) {
+  if (heatIndex == null) return null;
+
+  if (heatIndex < 27) {
+    return ["Comfortable conditions. No heat-related risk."];
+  }
+
+  if (heatIndex < 33) {
+    return [
+      "27°C – 32°C : CAUTION",
+      "• Possible fatigue with prolonged exposure",
+      "• Low risk, but still uncomfortable",
+    ];
+  }
+
+  if (heatIndex < 41.1) {
+    return [
+      "33°C – 41°C : EXTREME CAUTION",
+      "• Higher chance of heat cramps",
+      "• Possible heat exhaustion",
+      "• Extra hydration and breaks needed",
+      "• Vulnerable groups are more at risk",
+    ];
+  }
+
+  if (heatIndex < 52) {
+    return [
+      "42°C – 51°C : DANGER",
+      "• Likely heat cramps and heat exhaustion",
+      "• Heat stroke becomes possible with prolonged exposure",
+      "• Outdoor activities become risky",
+      "• This level is often considered a suspension reference point in local heat advisories",
+    ];
+  }
+
+  return [
+    "52°C and above : EXTREME DANGER",
+    "• Heat stroke highly likely",
+    "• Very unsafe for prolonged exposure",
+    "• Immediate protective measures required",
+  ];
+}
+
+/* =====================================================================
  * UI Helpers
  * ===================================================================== */
 
@@ -2286,51 +2409,58 @@ function listenToData() {
   };
 
   const updateFromSensorData = () => {
-    if (activeRoom !== REAL_ROOM_ID) return;
+    try {
+      if (activeRoom !== REAL_ROOM_ID) return;
 
-    const roomData = processSensorData();
-    if (!roomData) return;
+      const roomData = processSensorData();
+      if (!roomData) {
+        console.warn("No room data to update dashboard");
+        return;
+      }
 
-    backendDown = false;
-    consecutiveFailures = 0;
-    connectionQuality = "good";
+      backendDown = false;
+      consecutiveFailures = 0;
+      connectionQuality = "good";
 
-    const temp = roomData.averageTemperature;
-    const hum = roomData.averageHumidity;
-    const hi = roomData.heatIndex;
+      const temp = roomData.averageTemperature;
+      const hum = roomData.averageHumidity;
+      const hi = roomData.heatIndex;
 
-    updateDashboard(
-      temp,
-      hum,
-      hi,
-      roomData.label,
-      roomData.advisory,
-      roomData.monitoringStatus,
-      roomData,
-    );
-    updateSparkline(temp, hum, hi);
+      updateDashboard(
+        temp,
+        hum,
+        hi,
+        roomData.label,
+        roomData.advisory,
+        roomData.monitoringStatus,
+        roomData,
+      );
+      updateSparkline(temp, hum, hi);
 
-    latestAIContext = {
-      room: REAL_ROOM_ID,
-      temperature: temp,
-      humidity: hum,
-      heatIndex: hi,
-      label: roomData.label,
-      advisory: roomData.advisory,
-    };
+      latestAIContext = {
+        room: REAL_ROOM_ID,
+        temperature: temp,
+        humidity: hum,
+        heatIndex: hi,
+        label: roomData.label,
+        advisory: roomData.advisory,
+      };
 
-    updateAIContext({
-      room: REAL_ROOM_ID,
-      temperature: temp,
-      humidity: hum,
-      heatIndex: hi,
-      label: roomData.label,
-      advisory: roomData.advisory,
-      backendDown: false,
-      sensorsDown: false,
-    });
+      updateAIContext({
+        room: REAL_ROOM_ID,
+        temperature: temp,
+        humidity: hum,
+        heatIndex: hi,
+        label: roomData.label,
+        advisory: roomData.advisory,
+        backendDown: false,
+        sensorsDown: false,
+      });
 
-    cacheSuccessfulData(roomData);
+      cacheSuccessfulData(roomData);
+    } catch (err) {
+      console.error("Error updating from sensor data:", err);
+    }
   };
 
   // Listen to each sensor document in real-time
@@ -2644,6 +2774,10 @@ window.onload = () => {
   threeApp = initThreeJS();
   initSparkline();
   initMetricSparklines();
+  
+  // Initialize dashboard with default state before listeners fire
+  updateDashboard(0, 0, 0, "Waiting Data", ["Initializing system..."], "Waiting for sensor data...", null);
+  
   listenToData();
   listenToSideSensorsData();
   initAIChat();

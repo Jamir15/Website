@@ -377,19 +377,26 @@ async function getHistoricalLogs(collectionName, nodeName) {
 
     return snapshot.docs.map((doc, index) => {
       const data = doc.data();
+      const temp =
+        typeof data.Temperature === "number"
+          ? Number(data.Temperature.toFixed(1))
+          : "";
+      const hum =
+        typeof data.Humidity === "number"
+          ? Number(data.Humidity.toFixed(1))
+          : "";
+      const heatIdx =
+        typeof temp === "number" && typeof hum === "number"
+          ? computeHeatIndex(temp, hum)
+          : "";
 
       return {
         logNumber: index + 1,
         nodeName,
         timestamp: formatFirestoreTimestamp(data.timestamp),
-        temperature:
-          typeof data.Temperature === "number"
-            ? Number(data.Temperature.toFixed(1))
-            : "",
-        humidity:
-          typeof data.Humidity === "number"
-            ? Number(data.Humidity.toFixed(1))
-            : "",
+        temperature: temp,
+        humidity: hum,
+        heatIndex: heatIdx,
       };
     });
   } catch (error) {
@@ -410,6 +417,7 @@ function addHistoricalWorksheet(workbook, sheetName, rows) {
     { header: "Timestamp", key: "timestamp", width: 28 },
     { header: "Temperature (°C)", key: "temperature", width: 18 },
     { header: "Humidity (%)", key: "humidity", width: 15 },
+    { header: "Heat Index (°C)", key: "heatIndex", width: 16 },
   ];
 
   worksheet.getRow(1).font = { bold: true };
@@ -422,6 +430,7 @@ function addHistoricalWorksheet(workbook, sheetName, rows) {
       timestamp: "No data available",
       temperature: "",
       humidity: "",
+      heatIndex: "",
     });
     return;
   }

@@ -33,7 +33,7 @@ String refreshToken;
 unsigned long tokenExpiryTime = 0;
 
 // ================= TIMING =================
-#define SYNC_INTERVAL 60000UL
+#define SYNC_INTERVAL 1000UL
 #define NTP_RETRY_INTERVAL 10000UL
 
 unsigned long lastSync = 0;

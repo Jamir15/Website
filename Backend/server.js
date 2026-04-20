@@ -406,6 +406,117 @@ async function getHistoricalLogs(collectionName, nodeName) {
 }
 
 /**
+ * Get averaged historical logs across all nodes
+ */
+async function getAveragedHistoricalLogs() {
+  try {
+    // Collect all logs from all collections
+    const allLogs = [];
+    
+    for (const item of ROOM1_LOG_COLLECTIONS) {
+      const snapshot = await db
+        .collection(item.collection)
+        .orderBy("timestamp", "asc")
+        .get();
+
+      snapshot.docs.forEach((doc) => {
+        const data = doc.data();
+        const temp =
+          typeof data.Temperature === "number"
+            ? Number(data.Temperature.toFixed(1))
+            : null;
+        const hum =
+          typeof data.Humidity === "number"
+            ? Number(data.Humidity.toFixed(1))
+            : null;
+
+        if (temp !== null && hum !== null) {
+          allLogs.push({
+            timestamp: formatFirestoreTimestamp(data.timestamp),
+            temperature: temp,
+            humidity: hum,
+          });
+        }
+      });
+    }
+
+    // Group by timestamp and calculate averages
+    const timestampMap = {};
+    
+    allLogs.forEach((log) => {
+      if (!timestampMap[log.timestamp]) {
+        timestampMap[log.timestamp] = {
+          temperatures: [],
+          humidities: [],
+        };
+      }
+      timestampMap[log.timestamp].temperatures.push(log.temperature);
+      timestampMap[log.timestamp].humidities.push(log.humidity);
+    });
+
+    // Convert to averaged rows sorted by timestamp
+    const averagedRows = Object.entries(timestampMap)
+      .map(([timestamp, values]) => {
+        const avgTemp = Number(
+          (values.temperatures.reduce((a, b) => a + b, 0) / values.temperatures.length).toFixed(1)
+        );
+        const avgHum = Number(
+          (values.humidities.reduce((a, b) => a + b, 0) / values.humidities.length).toFixed(1)
+        );
+        const heatIdx = computeHeatIndex(avgTemp, avgHum);
+
+        return {
+          timestamp,
+          temperature: avgTemp,
+          humidity: avgHum,
+          heatIndex: heatIdx,
+        };
+      })
+      .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
+      .map((row, index) => ({
+        logNumber: index + 1,
+        ...row,
+      }));
+
+    return averagedRows;
+  } catch (error) {
+    console.error("Error fetching averaged historical logs:", error);
+    throw error;
+  }
+}
+
+/**
+ * Add room summary averaged worksheet
+ */
+function addAveragedSummaryWorksheet(workbook, rows) {
+  const worksheet = workbook.addWorksheet("Room Summary");
+
+  worksheet.columns = [
+    { header: "Log Number", key: "logNumber", width: 14 },
+    { header: "Timestamp", key: "timestamp", width: 28 },
+    { header: "Avg Temperature (°C)", key: "temperature", width: 20 },
+    { header: "Avg Humidity (%)", key: "humidity", width: 18 },
+    { header: "Heat Index (°C)", key: "heatIndex", width: 16 },
+  ];
+
+  worksheet.getRow(1).font = { bold: true };
+  worksheet.views = [{ state: "frozen", ySplit: 1 }];
+
+  if (rows.length === 0) {
+    worksheet.addRow({
+      logNumber: "",
+      timestamp: "No data available",
+      temperature: "",
+      humidity: "",
+      heatIndex: "",
+    });
+    return;
+  }
+
+  rows.forEach((row) => worksheet.addRow(row));
+}
+
+/**
  * Add one worksheet for one historical logs collection
  */
 function addHistoricalWorksheet(workbook, sheetName, rows) {
@@ -539,6 +650,11 @@ app.get("/api/export/historical-logs/excel", async (req, res) => {
     workbook.created = new Date();
     workbook.modified = new Date();
 
+    // Add Room Summary sheet first
+    const averagedRows = await getAveragedHistoricalLogs();
+    addAveragedSummaryWorksheet(workbook, averagedRows);
+
+    // Add individual node sheets
     for (const item of ROOM1_LOG_COLLECTIONS) {
       const rows = await getHistoricalLogs(
         item.collection,

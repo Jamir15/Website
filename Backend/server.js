@@ -108,6 +108,48 @@ function formatFirestoreTimestamp(timestampValue) {
 }
 
 /**
+ * Format timestamp for Excel export readability
+ * Output: MM/DD/YYYY HH:MM:SS AM/PM
+ */
+function formatTimestampForExport(timestampValue) {
+  if (!timestampValue) return "";
+
+  let date = null;
+
+  if (typeof timestampValue.toDate === "function") {
+    date = timestampValue.toDate();
+  } else if (timestampValue instanceof Date) {
+    date = timestampValue;
+  } else if (typeof timestampValue === "string") {
+    date = new Date(timestampValue);
+  } else if (
+    typeof timestampValue === "object" &&
+    typeof timestampValue._seconds === "number"
+  ) {
+    date = new Date(timestampValue._seconds * 1000);
+  }
+
+  if (!date || Number.isNaN(date.getTime())) {
+    return "";
+  }
+
+  const datePart = date.toLocaleDateString("en-US", {
+    month: "2-digit",
+    day: "2-digit",
+    year: "numeric",
+  });
+
+  const timePart = date.toLocaleTimeString("en-US", {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: true,
+  });
+
+  return `${datePart} ${timePart}`;
+}
+
+/**
  * Build monitoring status message
  */
 function buildMonitoringStatusMessage(availableNodes, totalNodes) {
@@ -515,7 +557,7 @@ async function getHistoricalLogs(collectionName, nodeName, dateFilter = null) {
           rows.push({
             logNumber: rows.length + 1,
             nodeName,
-            timestamp: formatFirestoreTimestamp(data.timestamp),
+            timestamp: formatTimestampForExport(data.timestamp),
             temperature: temp,
             humidity: hum,
             heatIndex: heatIdx,
@@ -652,6 +694,7 @@ async function getAveragedHistoricalLogs(dateFilter = null) {
       .map((row, index) => ({
         logNumber: index + 1,
         ...row,
+        timestamp: formatTimestampForExport(row.timestamp),
       }));
 
     return averagedRows;

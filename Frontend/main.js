@@ -2688,24 +2688,45 @@ async function updatePhilippineDateTime() {
  * Export Historical Logs
  * ===================================================================== */
 
+let exportLogsInProgress = false;
+
 async function exportHistoricalLogs() {
+  if (exportLogsInProgress) {
+    return;
+  }
+
   const exportLogsButton = document.getElementById("export-logs-button");
   const originalLabel = exportLogsButton
     ? exportLogsButton.textContent
     : "Download";
 
   try {
+    exportLogsInProgress = true;
+
     if (exportLogsButton) {
       exportLogsButton.disabled = true;
       exportLogsButton.textContent = "Downloading...";
     }
 
     const url = `${BACKEND_URL}/api/export/historical-logs/excel`;
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 35000); // 35 second timeout
+    const fetchExport = async () => {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 35000); // 35 second timeout
+      try {
+        return await fetch(url, { signal: controller.signal });
+      } finally {
+        clearTimeout(timeout);
+      }
+    };
 
-    const res = await fetch(url, { signal: controller.signal });
-    clearTimeout(timeout);
+    let res;
+    try {
+      res = await fetchExport();
+    } catch (networkErr) {
+      // Retry once for transient network/cold-start issues
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+      res = await fetchExport();
+    }
 
     if (!res.ok) {
       // Try to parse error details from response
@@ -2755,6 +2776,7 @@ async function exportHistoricalLogs() {
     
     showToast(errorMessage, "error");
   } finally {
+    exportLogsInProgress = false;
     if (exportLogsButton) {
       exportLogsButton.disabled = false;
       exportLogsButton.textContent = originalLabel;

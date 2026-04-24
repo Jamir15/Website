@@ -195,20 +195,13 @@
                             Export Historical Data Logs
                         </span>
                         <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
-                            <select id="export-date-range" class="settings-action-button" style="padding: 8px 12px; min-width: 150px; cursor: pointer;">
-                                <option value="all">All History</option>
-                                <option value="7days" selected>Last 7 Days</option>
-                                <option value="30days">Last 30 Days</option>
-                                <option value="90days">Last 90 Days</option>
-                                <option value="custom">Custom Range</option>
-                            </select>
                             <button
                                 type="button"
                                 class="settings-action-button"
                                 id="export-logs-button"
                                 onclick="exportHistoricalLogs()"
                             >
-                                Download
+                                Download (Last 7 Days)
                             </button>
                         </div>
                     </div>

@@ -68,8 +68,11 @@ const ROOM_REFRESH_INTERVAL_MS = Number(
 
 // Limit export batch size to prevent memory overload
 const EXPORT_BATCH_SIZE = 500;
+const LOG_RETENTION_DAYS = 90;
+const LOG_CLEANUP_INTERVAL_MS = 24 * 60 * 60 * 1000;
 const roomResponseCache = {};
 let cacheRefreshInterval = null;
+let logCleanupInterval = null;
 
 // ------------------------------------------------------------
 // Utility Functions
@@ -405,6 +408,62 @@ function getDateFilter(dateRange) {
 }
 
 /**
+ * Delete historical logs older than a given number of days
+ */
+async function clearLogsOlderThanDays(daysOld = LOG_RETENTION_DAYS) {
+  const cutoffDate = new Date(Date.now() - daysOld * 24 * 60 * 60 * 1000);
+  let totalDeleted = 0;
+
+  for (const item of ROOM1_LOG_COLLECTIONS) {
+    try {
+      const snapshot = await db
+        .collection(item.collection)
+        .where("timestamp", "<", cutoffDate)
+        .get();
+
+      for (let i = 0; i < snapshot.docs.length; i += 500) {
+        const batch = db.batch();
+        const chunk = snapshot.docs.slice(i, i + 500);
+        chunk.forEach((doc) => batch.delete(doc.ref));
+        await batch.commit();
+        totalDeleted += chunk.length;
+      }
+    } catch (error) {
+      console.warn(`Could not clear ${item.collection}:`, error.message);
+    }
+  }
+
+  return {
+    cutoffDate,
+    totalDeleted,
+  };
+}
+
+async function runAutomaticLogCleanup(daysOld = LOG_RETENTION_DAYS) {
+  try {
+    const result = await clearLogsOlderThanDays(daysOld);
+    console.log(
+      `Auto cleanup completed: deleted ${result.totalDeleted} docs older than ${daysOld} days (before ${result.cutoffDate.toISOString()})`
+    );
+  } catch (error) {
+    console.error("Auto cleanup failed:", error);
+  }
+}
+
+function startAutomaticLogCleanup() {
+  runAutomaticLogCleanup(LOG_RETENTION_DAYS);
+
+  if (logCleanupInterval) {
+    clearInterval(logCleanupInterval);
+  }
+
+  logCleanupInterval = setInterval(
+    () => runAutomaticLogCleanup(LOG_RETENTION_DAYS),
+    LOG_CLEANUP_INTERVAL_MS
+  );
+}
+
+/**
  * Get historical logs for one Firestore collection with optional date filter
  */
 async function getHistoricalLogs(collectionName, nodeName, dateFilter = null) {
@@ -716,35 +775,9 @@ app.post("/api/admin/clear-old-logs", async (req, res) => {
   try {
     const { daysOld = 90 } = req.body || {};
 
-    // Calculate cutoff date
-    const cutoffDate = new Date(Date.now() - daysOld * 24 * 60 * 60 * 1000);
+    const { cutoffDate, totalDeleted } = await clearLogsOlderThanDays(daysOld);
 
     console.log(`Clearing logs older than ${daysOld} days (before ${cutoffDate.toISOString()})`);
-
-    let totalDeleted = 0;
-
-    // Delete from all 4 collections
-    for (const item of ROOM1_LOG_COLLECTIONS) {
-      try {
-        const snapshot = await db
-          .collection(item.collection)
-          .where("timestamp", "<", cutoffDate)
-          .get();
-
-        console.log(`Found ${snapshot.docs.length} docs to delete in ${item.collection}`);
-
-        // Delete in batches (Firestore max 500 operations per batch)
-        for (let i = 0; i < snapshot.docs.length; i += 500) {
-          const batch = db.batch();
-          const chunk = snapshot.docs.slice(i, i + 500);
-          chunk.forEach((doc) => batch.delete(doc.ref));
-          await batch.commit();
-          totalDeleted += chunk.length;
-        }
-      } catch (collError) {
-        console.warn(`Could not clear ${item.collection}:`, collError.message);
-      }
-    }
 
     console.log(`Cleared ${totalDeleted} total log documents`);
 
@@ -897,6 +930,7 @@ app.get("/api/export/historical-logs/excel", async (req, res) => {
 // Start backend room cache polling
 // ------------------------------------------------------------
 startRoomCachePolling("room1");
+startAutomaticLogCleanup();
 
 // ------------------------------------------------------------
 // Start Server

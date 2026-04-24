@@ -714,7 +714,7 @@ app.get("/api/:roomName", async (req, res) => {
  */
 app.post("/api/admin/clear-old-logs", async (req, res) => {
   try {
-    const { daysOld = 90 } = req.body;
+    const { daysOld = 90 } = req.body || {};
 
     // Calculate cutoff date
     const cutoffDate = new Date(Date.now() - daysOld * 24 * 60 * 60 * 1000);
@@ -733,19 +733,14 @@ app.post("/api/admin/clear-old-logs", async (req, res) => {
 
         console.log(`Found ${snapshot.docs.length} docs to delete in ${item.collection}`);
 
-        // Delete in batches to avoid memory issues
-        const batch = db.batch();
-        snapshot.docs.forEach((doc, index) => {
-          batch.delete(doc.ref);
-          // Firebase batch limit is 500 operations
-          if ((index + 1) % 500 === 0 || index === snapshot.docs.length - 1) {
-            batch.commit().then(() => {
-              totalDeleted += Math.min(500, snapshot.docs.length - index);
-            });
-          }
-        });
-
-        totalDeleted += snapshot.docs.length;
+        // Delete in batches (Firestore max 500 operations per batch)
+        for (let i = 0; i < snapshot.docs.length; i += 500) {
+          const batch = db.batch();
+          const chunk = snapshot.docs.slice(i, i + 500);
+          chunk.forEach((doc) => batch.delete(doc.ref));
+          await batch.commit();
+          totalDeleted += chunk.length;
+        }
       } catch (collError) {
         console.warn(`Could not clear ${item.collection}:`, collError.message);
       }
@@ -813,11 +808,10 @@ app.get("/api/export/historical-logs/excel", async (req, res) => {
   let buffer = null;
   
   try {
-    // Get date range filter from query parameter
-    const dateRange = req.query.dateRange || "7days";
-    const dateFilter = getDateFilter(dateRange);
+    // Always export the latest 7 days of logs
+    const dateFilter = getDateFilter("7days");
     
-    console.log(`Export requested with date range: ${dateRange}`);
+    console.log("Export requested for fixed date range: 7days");
 
     // Set timeout for the entire export process
     const exportTimeout = setTimeout(() => {
@@ -853,7 +847,7 @@ app.get("/api/export/historical-logs/excel", async (req, res) => {
       }
 
       // Log success
-      console.log(`Export successful: ${totalDocsExported} documents exported (${dateRange})`);
+      console.log(`Export successful: ${totalDocsExported} documents exported (7days)`);
 
       buffer = await workbook.xlsx.writeBuffer();
 
@@ -866,7 +860,7 @@ app.get("/api/export/historical-logs/excel", async (req, res) => {
       );
       res.setHeader(
         "Content-Disposition",
-        `attachment; filename="historical_data_logs_${dateRange}.xlsx"`
+        'attachment; filename="historical_data_logs_7days.xlsx"'
       );
       res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
       res.setHeader("Pragma", "no-cache");

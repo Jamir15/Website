@@ -68,6 +68,7 @@ const ROOM_REFRESH_INTERVAL_MS = Number(
 
 // Limit export batch size to prevent memory overload
 const EXPORT_BATCH_SIZE = 500;
+const EXPORT_TIMEOUT_MS = Number(process.env.EXPORT_TIMEOUT_MS || 90000);
 const LOG_RETENTION_DAYS = 90;
 const LOG_CLEANUP_INTERVAL_MS = 24 * 60 * 60 * 1000;
 const roomResponseCache = {};
@@ -470,10 +471,10 @@ async function getHistoricalLogs(collectionName, nodeName, dateFilter = null) {
   try {
     const rows = [];
     let batchIndex = 0;
-    let hasMore = true;
+    let lastDoc = null;
 
-    // Fetch documents in batches to prevent memory overload
-    while (hasMore) {
+    // Fetch documents in batches using cursor pagination (faster than offset)
+    while (true) {
       try {
         let query = db
           .collection(collectionName)
@@ -484,14 +485,15 @@ async function getHistoricalLogs(collectionName, nodeName, dateFilter = null) {
           query = query.where("timestamp", ">=", dateFilter);
         }
 
-        query = query
-          .limit(EXPORT_BATCH_SIZE)
-          .offset(batchIndex * EXPORT_BATCH_SIZE);
+        if (lastDoc) {
+          query = query.startAfter(lastDoc);
+        }
+
+        query = query.limit(EXPORT_BATCH_SIZE);
 
         const snapshot = await query.get();
 
         if (snapshot.empty) {
-          hasMore = false;
           break;
         }
 
@@ -520,15 +522,17 @@ async function getHistoricalLogs(collectionName, nodeName, dateFilter = null) {
           });
         });
 
+        lastDoc = snapshot.docs[snapshot.docs.length - 1];
+
         // If we got fewer docs than batch size, there are no more
         if (snapshot.docs.length < EXPORT_BATCH_SIZE) {
-          hasMore = false;
+          break;
         }
 
         batchIndex++;
       } catch (batchError) {
         console.warn(`Batch ${batchIndex} failed for ${collectionName}:`, batchError.message);
-        hasMore = false;
+        break;
       }
     }
 
@@ -552,9 +556,9 @@ async function getAveragedHistoricalLogs(dateFilter = null) {
     for (const item of ROOM1_LOG_COLLECTIONS) {
       try {
         let batchIndex = 0;
-        let hasMore = true;
+        let lastDoc = null;
 
-        while (hasMore) {
+        while (true) {
           try {
             let query = db
               .collection(item.collection)
@@ -565,14 +569,15 @@ async function getAveragedHistoricalLogs(dateFilter = null) {
               query = query.where("timestamp", ">=", dateFilter);
             }
 
-            query = query
-              .limit(EXPORT_BATCH_SIZE)
-              .offset(batchIndex * EXPORT_BATCH_SIZE);
+            if (lastDoc) {
+              query = query.startAfter(lastDoc);
+            }
+
+            query = query.limit(EXPORT_BATCH_SIZE);
 
             const snapshot = await query.get();
 
             if (snapshot.empty) {
-              hasMore = false;
               break;
             }
 
@@ -600,14 +605,16 @@ async function getAveragedHistoricalLogs(dateFilter = null) {
               }
             });
 
+            lastDoc = snapshot.docs[snapshot.docs.length - 1];
+
             if (snapshot.docs.length < EXPORT_BATCH_SIZE) {
-              hasMore = false;
+              break;
             }
 
             batchIndex++;
           } catch (batchError) {
             console.warn(`Batch ${batchIndex} failed for ${item.collection}:`, batchError.message);
-            hasMore = false;
+            break;
           }
         }
       } catch (collectionError) {
@@ -849,12 +856,12 @@ app.get("/api/export/historical-logs/excel", async (req, res) => {
     // Set timeout for the entire export process
     const exportTimeout = setTimeout(() => {
       if (!res.headersSent) {
-        console.error("Export timeout: Taking longer than 30 seconds");
+        console.error(`Export timeout: Taking longer than ${Math.floor(EXPORT_TIMEOUT_MS / 1000)} seconds`);
         return res.status(504).json({
           error: "Export request timed out. Collections may be too large.",
         });
       }
-    }, 30000);
+    }, EXPORT_TIMEOUT_MS);
 
     try {
       const workbook = new ExcelJS.Workbook();

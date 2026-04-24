@@ -60,6 +60,11 @@ const ROOM1_LOG_COLLECTIONS = [
   { position: "left", collection: "room1_left_logs", sheet: "Room1 Left Logs" },
   { position: "right", collection: "room1_right_logs", sheet: "Room1 Right Logs" },
 ];
+const TOTAL_ROOM1_NODES = ROOM1_SENSOR_DOCS.length;
+
+const ROOM_REFRESH_INTERVAL_MS = Number(
+  process.env.ROOM_REFRESH_INTERVAL_MS || 5000
+);
 
 // Limit export batch size to prevent memory overload
 const EXPORT_BATCH_SIZE = 500;
@@ -762,7 +767,7 @@ app.post("/api/admin/clear-old-logs", async (req, res) => {
   }
 });
 
-/**
+
 app.post("/api/ai/heat-index", async (req, res) => {
   try {
     const {

@@ -2701,13 +2701,35 @@ async function exportHistoricalLogs() {
     }
 
     const url = `${BACKEND_URL}/api/export/historical-logs/excel`;
-    const res = await fetch(url);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 35000); // 35 second timeout
+
+    const res = await fetch(url, { signal: controller.signal });
+    clearTimeout(timeout);
 
     if (!res.ok) {
-      throw new Error(`Export failed (${res.status})`);
+      // Try to parse error details from response
+      let errorMessage = `Export failed (${res.status})`;
+      try {
+        const errorData = await res.json();
+        errorMessage = errorData.error || errorMessage;
+        if (errorData.details) {
+          errorMessage += `: ${errorData.details}`;
+        }
+      } catch (e) {
+        // If response is not JSON, use status text
+        errorMessage = `Export failed (${res.status} ${res.statusText})`;
+      }
+      throw new Error(errorMessage);
     }
 
     const blob = await res.blob();
+    
+    // Verify blob size
+    if (blob.size === 0) {
+      throw new Error("Export file is empty. No data to download.");
+    }
+
     const downloadUrl = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = downloadUrl;
@@ -2717,10 +2739,21 @@ async function exportHistoricalLogs() {
     link.remove();
     URL.revokeObjectURL(downloadUrl);
 
-    showToast("Download started.", "success");
+    showToast("Download started. File: historical_data_logs.xlsx", "success");
   } catch (err) {
     console.error("Export download error:", err);
-    showToast("Failed to download logs. Please try again.", "error");
+    
+    // Provide detailed error message
+    let errorMessage = "Failed to download logs.";
+    if (err.name === "AbortError") {
+      errorMessage = "Download timed out. Collections may be too large. Try again later.";
+    } else if (err.message.includes("Export failed")) {
+      errorMessage = err.message;
+    } else if (err.message) {
+      errorMessage = `Error: ${err.message}`;
+    }
+    
+    showToast(errorMessage, "error");
   } finally {
     if (exportLogsButton) {
       exportLogsButton.disabled = false;

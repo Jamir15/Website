@@ -61,9 +61,10 @@ const ROOM1_LOG_COLLECTIONS = [
   { position: "right", collection: "room1_right_logs", sheet: "Room1 Right Logs" },
 ];
 
-const TOTAL_ROOM1_NODES = ROOM1_SENSOR_DOCS.length;
-const ROOM_REFRESH_INTERVAL_MS = 60000;
+// Limit export batch size to prevent memory overload
+const EXPORT_BATCH_SIZE = 500;
 const roomResponseCache = {};
+let cacheRefreshInterval = null;
 
 // ------------------------------------------------------------
 // Utility Functions
@@ -362,7 +363,14 @@ async function refreshRoomCache(roomName) {
 
 function startRoomCachePolling(roomName) {
   refreshRoomCache(roomName);
-  setInterval(() => refreshRoomCache(roomName), ROOM_REFRESH_INTERVAL_MS);
+  // Store interval ID so we can clear it if needed
+  if (cacheRefreshInterval) {
+    clearInterval(cacheRefreshInterval);
+  }
+  cacheRefreshInterval = setInterval(
+    () => refreshRoomCache(roomName),
+    ROOM_REFRESH_INTERVAL_MS
+  );
 }
 
 /**
@@ -370,89 +378,146 @@ function startRoomCachePolling(roomName) {
  */
 async function getHistoricalLogs(collectionName, nodeName) {
   try {
-    const snapshot = await db
-      .collection(collectionName)
-      .orderBy("timestamp", "asc")
-      .get();
+    const rows = [];
+    let batchIndex = 0;
+    let hasMore = true;
 
-    return snapshot.docs.map((doc, index) => {
-      const data = doc.data();
-      const temp =
-        typeof data.Temperature === "number"
-          ? Number(data.Temperature.toFixed(1))
-          : "";
-      const hum =
-        typeof data.Humidity === "number"
-          ? Number(data.Humidity.toFixed(1))
-          : "";
-      const heatIdx =
-        typeof temp === "number" && typeof hum === "number"
-          ? computeHeatIndex(temp, hum)
-          : "";
+    // Fetch documents in batches to prevent memory overload
+    while (hasMore) {
+      try {
+        let query = db
+          .collection(collectionName)
+          .orderBy("timestamp", "asc")
+          .limit(EXPORT_BATCH_SIZE)
+          .offset(batchIndex * EXPORT_BATCH_SIZE);
 
-      return {
-        logNumber: index + 1,
-        nodeName,
-        timestamp: formatFirestoreTimestamp(data.timestamp),
-        temperature: temp,
-        humidity: hum,
-        heatIndex: heatIdx,
-      };
-    });
+        const snapshot = await query.get();
+
+        if (snapshot.empty) {
+          hasMore = false;
+          break;
+        }
+
+        snapshot.docs.forEach((doc, idx) => {
+          const data = doc.data();
+          const temp =
+            typeof data.Temperature === "number"
+              ? Number(data.Temperature.toFixed(1))
+              : "";
+          const hum =
+            typeof data.Humidity === "number"
+              ? Number(data.Humidity.toFixed(1))
+              : "";
+          const heatIdx =
+            typeof temp === "number" && typeof hum === "number"
+              ? computeHeatIndex(temp, hum)
+              : "";
+
+          rows.push({
+            logNumber: rows.length + 1,
+            nodeName,
+            timestamp: formatFirestoreTimestamp(data.timestamp),
+            temperature: temp,
+            humidity: hum,
+            heatIndex: heatIdx,
+          });
+        });
+
+        // If we got fewer docs than batch size, there are no more
+        if (snapshot.docs.length < EXPORT_BATCH_SIZE) {
+          hasMore = false;
+        }
+
+        batchIndex++;
+      } catch (batchError) {
+        console.warn(`Batch ${batchIndex} failed for ${collectionName}:`, batchError.message);
+        hasMore = false;
+      }
+    }
+
+    return rows;
   } catch (error) {
     console.error(`Error fetching historical logs for ${collectionName}:`, error);
-    throw error;
+    // Return empty array instead of throwing - allows other collections to be processed
+    return [];
   }
 }
 
 /**
- * Get averaged historical logs across all nodes
+ * Get averaged historical logs across all nodes (with pagination to prevent memory overload)
  */
 async function getAveragedHistoricalLogs() {
   try {
-    // Collect all logs from all collections
-    const allLogs = [];
+    // Collect logs from all collections in batches
+    const timestampMap = {};
+    let collectionsFailed = 0;
     
     for (const item of ROOM1_LOG_COLLECTIONS) {
-      const snapshot = await db
-        .collection(item.collection)
-        .orderBy("timestamp", "asc")
-        .get();
+      try {
+        let batchIndex = 0;
+        let hasMore = true;
 
-      snapshot.docs.forEach((doc) => {
-        const data = doc.data();
-        const temp =
-          typeof data.Temperature === "number"
-            ? Number(data.Temperature.toFixed(1))
-            : null;
-        const hum =
-          typeof data.Humidity === "number"
-            ? Number(data.Humidity.toFixed(1))
-            : null;
+        while (hasMore) {
+          try {
+            let query = db
+              .collection(item.collection)
+              .orderBy("timestamp", "asc")
+              .limit(EXPORT_BATCH_SIZE)
+              .offset(batchIndex * EXPORT_BATCH_SIZE);
 
-        if (temp !== null && hum !== null) {
-          allLogs.push({
-            timestamp: formatFirestoreTimestamp(data.timestamp),
-            temperature: temp,
-            humidity: hum,
-          });
+            const snapshot = await query.get();
+
+            if (snapshot.empty) {
+              hasMore = false;
+              break;
+            }
+
+            snapshot.docs.forEach((doc) => {
+              const data = doc.data();
+              const temp =
+                typeof data.Temperature === "number"
+                  ? Number(data.Temperature.toFixed(1))
+                  : null;
+              const hum =
+                typeof data.Humidity === "number"
+                  ? Number(data.Humidity.toFixed(1))
+                  : null;
+
+              if (temp !== null && hum !== null) {
+                const timestamp = formatFirestoreTimestamp(data.timestamp);
+                if (!timestampMap[timestamp]) {
+                  timestampMap[timestamp] = {
+                    temperatures: [],
+                    humidities: [],
+                  };
+                }
+                timestampMap[timestamp].temperatures.push(temp);
+                timestampMap[timestamp].humidities.push(hum);
+              }
+            });
+
+            if (snapshot.docs.length < EXPORT_BATCH_SIZE) {
+              hasMore = false;
+            }
+
+            batchIndex++;
+          } catch (batchError) {
+            console.warn(`Batch ${batchIndex} failed for ${item.collection}:`, batchError.message);
+            hasMore = false;
+          }
         }
-      });
+      } catch (collectionError) {
+        // Log collection-specific errors but continue processing other collections
+        console.warn(`Warning: Could not fetch ${item.collection}:`, collectionError.message);
+        collectionsFailed++;
+      }
     }
 
-    // Group by timestamp and calculate averages
-    const timestampMap = {};
-    
-    allLogs.forEach((log) => {
-      if (!timestampMap[log.timestamp]) {
-        timestampMap[log.timestamp] = {
-          temperatures: [],
-          humidities: [],
-        };
-      }
-      timestampMap[log.timestamp].temperatures.push(log.temperature);
-      timestampMap[log.timestamp].humidities.push(log.humidity);
-    });
+    // If all collections failed, return empty array with warning
+    if (collectionsFailed === ROOM1_LOG_COLLECTIONS.length) {
+      console.warn("All collections failed to load. No historical data available.");
+      return [];
+    }
 
     // Convert to averaged rows sorted by timestamp
     const averagedRows = Object.entries(timestampMap)
@@ -481,7 +546,8 @@ async function getAveragedHistoricalLogs() {
     return averagedRows;
   } catch (error) {
     console.error("Error fetching averaged historical logs:", error);
-    throw error;
+    // Return empty array to allow partial export instead of complete failure
+    return [];
   }
 }
 
@@ -643,42 +709,84 @@ app.post("/api/ai/heat-index", async (req, res) => {
  * GET Export Historical Logs to Excel
  */
 app.get("/api/export/historical-logs/excel", async (req, res) => {
+  let buffer = null;
+  
   try {
-    const workbook = new ExcelJS.Workbook();
+    // Set timeout for the entire export process
+    const exportTimeout = setTimeout(() => {
+      if (!res.headersSent) {
+        console.error("Export timeout: Taking longer than 30 seconds");
+        return res.status(504).json({
+          error: "Export request timed out. Collections may be too large.",
+        });
+      }
+    }, 30000);
 
-    workbook.creator = "Smart Building Monitoring System";
-    workbook.created = new Date();
-    workbook.modified = new Date();
+    try {
+      const workbook = new ExcelJS.Workbook();
 
-    // Add Room Summary sheet first
-    const averagedRows = await getAveragedHistoricalLogs();
-    addAveragedSummaryWorksheet(workbook, averagedRows);
+      workbook.creator = "Smart Building Monitoring System";
+      workbook.created = new Date();
+      workbook.modified = new Date();
 
-    // Add individual node sheets
-    for (const item of ROOM1_LOG_COLLECTIONS) {
-      const rows = await getHistoricalLogs(
-        item.collection,
-        `room1_${item.position}`
+      // Add Room Summary sheet first
+      const averagedRows = await getAveragedHistoricalLogs();
+      addAveragedSummaryWorksheet(workbook, averagedRows);
+
+      // Add individual node sheets - collect all data
+      let totalDocsExported = 0;
+      for (const item of ROOM1_LOG_COLLECTIONS) {
+        const rows = await getHistoricalLogs(
+          item.collection,
+          `room1_${item.position}`
+        );
+        totalDocsExported += rows.length;
+        addHistoricalWorksheet(workbook, item.sheet, rows);
+      }
+
+      // Log success
+      console.log(`Export successful: ${totalDocsExported} documents exported`);
+
+      buffer = await workbook.xlsx.writeBuffer();
+
+      // Clear workbook from memory
+      workbook.removeWorksheet(workbook.worksheets.map(w => w.id));
+
+      res.setHeader(
+        "Content-Type",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
       );
-      addHistoricalWorksheet(workbook, item.sheet, rows);
+      res.setHeader(
+        "Content-Disposition",
+        'attachment; filename="historical_data_logs.xlsx"'
+      );
+      res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+      res.setHeader("Pragma", "no-cache");
+      res.setHeader("Expires", "0");
+
+      clearTimeout(exportTimeout);
+      
+      const responseBuffer = Buffer.from(buffer);
+      buffer = null; // Clear reference
+      
+      res.send(responseBuffer);
+      
+      // Suggest garbage collection for large exports
+      if (global.gc && totalDocsExported > 1000) {
+        setImmediate(() => global.gc());
+      }
+      
+      return;
+    } finally {
+      clearTimeout(exportTimeout);
+      buffer = null; // Ensure buffer is cleared
     }
-
-    const buffer = await workbook.xlsx.writeBuffer();
-
-    res.setHeader(
-      "Content-Type",
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    );
-    res.setHeader(
-      "Content-Disposition",
-      'attachment; filename="historical_data_logs.xlsx"'
-    );
-
-    return res.send(Buffer.from(buffer));
   } catch (error) {
     console.error("Export route error:", error);
     return res.status(500).json({
       error: "Failed to export historical data logs.",
+      details: error.message,
+      timestamp: new Date().toISOString(),
     });
   }
 });

@@ -687,10 +687,17 @@ function addAveragedSummaryWorksheet(workbook, rows) {
       humidity: "",
       heatIndex: "",
     });
+    if (typeof worksheet.commit === "function") {
+      worksheet.commit();
+    }
     return;
   }
 
   rows.forEach((row) => worksheet.addRow(row));
+
+  if (typeof worksheet.commit === "function") {
+    worksheet.commit();
+  }
 }
 
 /**
@@ -720,10 +727,17 @@ function addHistoricalWorksheet(workbook, sheetName, rows) {
       humidity: "",
       heatIndex: "",
     });
+    if (typeof worksheet.commit === "function") {
+      worksheet.commit();
+    }
     return;
   }
 
   rows.forEach((row) => worksheet.addRow(row));
+
+  if (typeof worksheet.commit === "function") {
+    worksheet.commit();
+  }
 }
 
 // ------------------------------------------------------------
@@ -845,8 +859,6 @@ app.post("/api/ai/heat-index", async (req, res) => {
  * GET Export Historical Logs to Excel
  */
 app.get("/api/export/historical-logs/excel", async (req, res) => {
-  let buffer = null;
-  
   try {
     // Always export the latest 7 days of logs
     const dateFilter = getDateFilter("7days");
@@ -864,7 +876,23 @@ app.get("/api/export/historical-logs/excel", async (req, res) => {
     }, EXPORT_TIMEOUT_MS);
 
     try {
-      const workbook = new ExcelJS.Workbook();
+      res.setHeader(
+        "Content-Type",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+      );
+      res.setHeader(
+        "Content-Disposition",
+        'attachment; filename="historical_data_logs_7days.xlsx"'
+      );
+      res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+      res.setHeader("Pragma", "no-cache");
+      res.setHeader("Expires", "0");
+
+      const workbook = new ExcelJS.stream.xlsx.WorkbookWriter({
+        stream: res,
+        useStyles: true,
+        useSharedStrings: false,
+      });
 
       workbook.creator = "Smart Building Monitoring System";
       workbook.created = new Date();
@@ -889,29 +917,9 @@ app.get("/api/export/historical-logs/excel", async (req, res) => {
       // Log success
       console.log(`Export successful: ${totalDocsExported} documents exported (7days)`);
 
-      buffer = await workbook.xlsx.writeBuffer();
-
-      // Clear workbook from memory
-      workbook.removeWorksheet(workbook.worksheets.map(w => w.id));
-
-      res.setHeader(
-        "Content-Type",
-        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-      );
-      res.setHeader(
-        "Content-Disposition",
-        'attachment; filename="historical_data_logs_7days.xlsx"'
-      );
-      res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
-      res.setHeader("Pragma", "no-cache");
-      res.setHeader("Expires", "0");
+      await workbook.commit();
 
       clearTimeout(exportTimeout);
-      
-      const responseBuffer = Buffer.from(buffer);
-      buffer = null; // Clear reference
-      
-      res.send(responseBuffer);
       
       // Suggest garbage collection for large exports
       if (global.gc && totalDocsExported > 1000) {
@@ -921,10 +929,12 @@ app.get("/api/export/historical-logs/excel", async (req, res) => {
       return;
     } finally {
       clearTimeout(exportTimeout);
-      buffer = null; // Ensure buffer is cleared
     }
   } catch (error) {
     console.error("Export route error:", error);
+    if (res.headersSent) {
+      return res.end();
+    }
     return res.status(500).json({
       error: "Failed to export historical data logs.",
       details: error.message,

@@ -2711,7 +2711,7 @@ async function exportHistoricalLogs() {
     const url = `${BACKEND_URL}/api/export/historical-logs/excel`;
     const fetchExport = async () => {
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 35000); // 35 second timeout
+      const timeout = setTimeout(() => controller.abort(), 95000); // Align with backend export timeout window
       try {
         return await fetch(url, { signal: controller.signal });
       } finally {

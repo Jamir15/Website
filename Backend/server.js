@@ -374,9 +374,35 @@ function startRoomCachePolling(roomName) {
 }
 
 /**
- * Get historical logs for one Firestore collection
+ * Calculate date filter based on range (7 days, 30 days, etc.)
  */
-async function getHistoricalLogs(collectionName, nodeName) {
+function getDateFilter(dateRange) {
+  const now = new Date();
+  let filterDate = null;
+
+  switch (dateRange) {
+    case "7days":
+      filterDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      break;
+    case "30days":
+      filterDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      break;
+    case "90days":
+      filterDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+      break;
+    case "all":
+    default:
+      filterDate = null; // No filter
+      break;
+  }
+
+  return filterDate;
+}
+
+/**
+ * Get historical logs for one Firestore collection with optional date filter
+ */
+async function getHistoricalLogs(collectionName, nodeName, dateFilter = null) {
   try {
     const rows = [];
     let batchIndex = 0;
@@ -387,7 +413,14 @@ async function getHistoricalLogs(collectionName, nodeName) {
       try {
         let query = db
           .collection(collectionName)
-          .orderBy("timestamp", "asc")
+          .orderBy("timestamp", "asc");
+
+        // Apply date filter if provided
+        if (dateFilter) {
+          query = query.where("timestamp", ">=", dateFilter);
+        }
+
+        query = query
           .limit(EXPORT_BATCH_SIZE)
           .offset(batchIndex * EXPORT_BATCH_SIZE);
 
@@ -446,7 +479,7 @@ async function getHistoricalLogs(collectionName, nodeName) {
 /**
  * Get averaged historical logs across all nodes (with pagination to prevent memory overload)
  */
-async function getAveragedHistoricalLogs() {
+async function getAveragedHistoricalLogs(dateFilter = null) {
   try {
     // Collect logs from all collections in batches
     const timestampMap = {};
@@ -461,7 +494,14 @@ async function getAveragedHistoricalLogs() {
           try {
             let query = db
               .collection(item.collection)
-              .orderBy("timestamp", "asc")
+              .orderBy("timestamp", "asc");
+
+            // Apply date filter if provided
+            if (dateFilter) {
+              query = query.where("timestamp", ">=", dateFilter);
+            }
+
+            query = query
               .limit(EXPORT_BATCH_SIZE)
               .offset(batchIndex * EXPORT_BATCH_SIZE);
 
@@ -665,8 +705,64 @@ app.get("/api/:roomName", async (req, res) => {
 });
 
 /**
- * POST AI Heat Index Explanation
+ * POST Clear Historical Logs older than X days
  */
+app.post("/api/admin/clear-old-logs", async (req, res) => {
+  try {
+    const { daysOld = 90 } = req.body;
+
+    // Calculate cutoff date
+    const cutoffDate = new Date(Date.now() - daysOld * 24 * 60 * 60 * 1000);
+
+    console.log(`Clearing logs older than ${daysOld} days (before ${cutoffDate.toISOString()})`);
+
+    let totalDeleted = 0;
+
+    // Delete from all 4 collections
+    for (const item of ROOM1_LOG_COLLECTIONS) {
+      try {
+        const snapshot = await db
+          .collection(item.collection)
+          .where("timestamp", "<", cutoffDate)
+          .get();
+
+        console.log(`Found ${snapshot.docs.length} docs to delete in ${item.collection}`);
+
+        // Delete in batches to avoid memory issues
+        const batch = db.batch();
+        snapshot.docs.forEach((doc, index) => {
+          batch.delete(doc.ref);
+          // Firebase batch limit is 500 operations
+          if ((index + 1) % 500 === 0 || index === snapshot.docs.length - 1) {
+            batch.commit().then(() => {
+              totalDeleted += Math.min(500, snapshot.docs.length - index);
+            });
+          }
+        });
+
+        totalDeleted += snapshot.docs.length;
+      } catch (collError) {
+        console.warn(`Could not clear ${item.collection}:`, collError.message);
+      }
+    }
+
+    console.log(`Cleared ${totalDeleted} total log documents`);
+
+    return res.json({
+      success: true,
+      message: `Deleted ${totalDeleted} logs older than ${daysOld} days`,
+      deletedCount: totalDeleted,
+    });
+  } catch (error) {
+    console.error("Clear logs error:", error);
+    return res.status(500).json({
+      error: "Failed to clear old logs.",
+      details: error.message,
+    });
+  }
+});
+
+/**
 app.post("/api/ai/heat-index", async (req, res) => {
   try {
     const {
@@ -712,6 +808,12 @@ app.get("/api/export/historical-logs/excel", async (req, res) => {
   let buffer = null;
   
   try {
+    // Get date range filter from query parameter
+    const dateRange = req.query.dateRange || "7days";
+    const dateFilter = getDateFilter(dateRange);
+    
+    console.log(`Export requested with date range: ${dateRange}`);
+
     // Set timeout for the entire export process
     const exportTimeout = setTimeout(() => {
       if (!res.headersSent) {
@@ -730,7 +832,7 @@ app.get("/api/export/historical-logs/excel", async (req, res) => {
       workbook.modified = new Date();
 
       // Add Room Summary sheet first
-      const averagedRows = await getAveragedHistoricalLogs();
+      const averagedRows = await getAveragedHistoricalLogs(dateFilter);
       addAveragedSummaryWorksheet(workbook, averagedRows);
 
       // Add individual node sheets - collect all data
@@ -738,14 +840,15 @@ app.get("/api/export/historical-logs/excel", async (req, res) => {
       for (const item of ROOM1_LOG_COLLECTIONS) {
         const rows = await getHistoricalLogs(
           item.collection,
-          `room1_${item.position}`
+          `room1_${item.position}`,
+          dateFilter
         );
         totalDocsExported += rows.length;
         addHistoricalWorksheet(workbook, item.sheet, rows);
       }
 
       // Log success
-      console.log(`Export successful: ${totalDocsExported} documents exported`);
+      console.log(`Export successful: ${totalDocsExported} documents exported (${dateRange})`);
 
       buffer = await workbook.xlsx.writeBuffer();
 
@@ -758,7 +861,7 @@ app.get("/api/export/historical-logs/excel", async (req, res) => {
       );
       res.setHeader(
         "Content-Disposition",
-        'attachment; filename="historical_data_logs.xlsx"'
+        `attachment; filename="historical_data_logs_${dateRange}.xlsx"`
       );
       res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
       res.setHeader("Pragma", "no-cache");

@@ -2690,17 +2690,28 @@ async function updatePhilippineDateTime() {
 
 async function exportHistoricalLogs() {
   const exportLogsButton = document.getElementById("export-logs-button");
+  const dateRangeSelect = document.getElementById("export-date-range");
   const originalLabel = exportLogsButton
     ? exportLogsButton.textContent
     : "Download";
 
   try {
+    // Get selected date range
+    const dateRange = dateRangeSelect ? dateRangeSelect.value : "7days";
+    const rangeLabels = {
+      "7days": "Last 7 Days",
+      "30days": "Last 30 Days",
+      "90days": "Last 90 Days",
+      all: "All History"
+    };
+    const rangeLabel = rangeLabels[dateRange] || dateRange;
+
     if (exportLogsButton) {
       exportLogsButton.disabled = true;
       exportLogsButton.textContent = "Downloading...";
     }
 
-    const url = `${BACKEND_URL}/api/export/historical-logs/excel`;
+    const url = `${BACKEND_URL}/api/export/historical-logs/excel?dateRange=${dateRange}`;
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 35000); // 35 second timeout
 
@@ -2727,26 +2738,26 @@ async function exportHistoricalLogs() {
     
     // Verify blob size
     if (blob.size === 0) {
-      throw new Error("Export file is empty. No data to download.");
+      throw new Error("Export file is empty. No data available for this date range.");
     }
 
     const downloadUrl = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = downloadUrl;
-    link.download = "historical_data_logs.xlsx";
+    link.download = `historical_data_logs_${dateRange}.xlsx`;
     document.body.appendChild(link);
     link.click();
     link.remove();
     URL.revokeObjectURL(downloadUrl);
 
-    showToast("Download started. File: historical_data_logs.xlsx", "success");
+    showToast(`Downloaded: ${rangeLabel} (historical_data_logs_${dateRange}.xlsx)`, "success");
   } catch (err) {
     console.error("Export download error:", err);
     
     // Provide detailed error message
     let errorMessage = "Failed to download logs.";
     if (err.name === "AbortError") {
-      errorMessage = "Download timed out. Collections may be too large. Try again later.";
+      errorMessage = "Download timed out. Try a shorter date range like 'Last 7 Days'.";
     } else if (err.message.includes("Export failed")) {
       errorMessage = err.message;
     } else if (err.message) {
